@@ -98,5 +98,9 @@ If a patch ever gets rewritten by a human and passes review, it could go upstrea
 
 ## Licence
 
-Patches are provided as-is. Underlying code belongs to the respective upstream
-projects and their licences apply.
+This repo is **GPL-3.0** — same as the upstream packages it patches
+(io.elementary.notifications is GPL-3.0). Patch files are derivative works of
+the upstream source they apply to and inherit that licence; the wrapper
+tooling (`ep`, `_scripts/`) is licensed under GPL-3.0 too for simplicity.
+
+See [LICENSE](LICENSE) for the full text.
