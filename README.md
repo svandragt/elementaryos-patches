@@ -11,14 +11,16 @@ bother me enough to maintain them locally.
 
 | Package | Patches | Description |
 |---------|---------|-------------|
-| [io.elementary.files](io.elementary.files/) | see series | File manager fixes |
+| [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11 |
+
+Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
 ## Quick start
 
 ### 1. Clone this repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/elementary-patches.git
+git clone https://github.com/svandragt/elementary-patches.git
 cd elementary-patches
 chmod +x ep _scripts/*.sh
 ```
@@ -32,8 +34,8 @@ cat quiltrc >> ~/.quiltrc
 ### 3. Apply patches and build a package
 
 ```bash
-./ep apply io.elementary.files       # fetches source, applies all patches
-./ep build io.elementary.files --install
+./ep apply io.elementary.notifications       # fetches source, applies all patches
+./ep build io.elementary.notifications --install
 ```
 
 That's it.
@@ -53,21 +55,21 @@ ep status  [package]              Show patch status
 ## Adding a new patch
 
 ```bash
-./ep apply io.elementary.files                         # make sure source is ready
-./ep new   io.elementary.files "fix crash on startup"  # create the patch
-./ep edit  io.elementary.files src/View/Miller.vala    # edit the file
-./ep refresh io.elementary.files                       # finalise the patch
-git add io.elementary.files/
-git commit -m "io.elementary.files: fix crash on startup"
+./ep apply   <package>                       # make sure source is ready
+./ep new     <package> "fix crash on startup" # create the patch
+./ep edit    <package> path/to/file.vala     # add file to patch and open in $EDITOR
+./ep refresh <package>                        # finalise the patch
+git add <package>/
+git commit -m "<package>: fix crash on startup"
 ```
 
 ## Updating after a new upstream release
 
 ```bash
-./ep refresh io.elementary.files --rebase
+./ep refresh io.elementary.notifications --rebase
 # Fix any failures (quilt will stop and tell you)
-git add io.elementary.files/
-git commit -m "io.elementary.files: rebase patches onto 6.4.0"
+git add io.elementary.notifications/
+git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 ```
 
 ## Environment variables
