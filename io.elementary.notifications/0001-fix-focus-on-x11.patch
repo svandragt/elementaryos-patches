@@ -1,12 +1,10 @@
-diff --git a/src/AbstractBubble.vala b/src/AbstractBubble.vala
-index 197fe0b..4fc53c2 100644
---- a/src/AbstractBubble.vala
-+++ b/src/AbstractBubble.vala
-@@ -166,7 +166,9 @@ public class Notifications.AbstractBubble : Gtk.Window {
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/AbstractBubble.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/AbstractBubble.vala
+@@ -166,7 +166,9 @@
          }
-
+ 
          if (Gdk.Display.get_default () is Gdk.X11.Display) {
--            // Avoid present on X11 because it focuses the window
+-            // Avoid present on X11 because it focuses the window 
 +            // Avoid present on X11 because it focuses the window
 +            // Realize first so we can set the window type atom before the WM sees it
 +            realize ();
