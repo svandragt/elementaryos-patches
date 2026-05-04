@@ -29,7 +29,7 @@ PATCHES_DIR="$REPO_DIR/$PACKAGE"
 SERIES_FILE="$PATCHES_DIR/series"
 
 # Count existing patches to get next number
-EXISTING=$(grep -c '\.patch$' "$SERIES_FILE" 2>/dev/null || echo 0)
+EXISTING=$(grep -c '\.patch$' "$SERIES_FILE" 2>/dev/null) || EXISTING=0
 NEXT=$(printf "%04d" $((EXISTING + 1)))
 
 # Slugify description
