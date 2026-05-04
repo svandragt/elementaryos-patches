@@ -1,0 +1,40 @@
+#!/bin/bash
+# ep — elementary-patches CLI wrapper
+# Put this in your PATH or call it directly
+# Usage: ep <command> [args...]
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS="$REPO_DIR/_scripts"
+
+CMD="${1:-help}"
+shift || true
+
+case "$CMD" in
+    apply)    bash "$SCRIPTS/apply.sh" "$@" ;;
+    new)      bash "$SCRIPTS/new-patch.sh" "$@" ;;
+    edit)     bash "$SCRIPTS/edit.sh" "$@" ;;
+    refresh)  bash "$SCRIPTS/refresh.sh" "$@" ;;
+    build)    bash "$SCRIPTS/build.sh" "$@" ;;
+    status)   bash "$SCRIPTS/status.sh" "$@" ;;
+    help|--help|-h)
+        echo "ep — elementary OS patch manager"
+        echo ""
+        echo "Commands:"
+        echo "  ep apply   <package>            Fetch source and apply all patches"
+        echo "  ep new     <package> <desc>      Create a new patch"
+        echo "  ep edit    <package> <file>      Add a file to current patch and open editor"
+        echo "  ep refresh <package>             Refresh top patch after editing"
+        echo "  ep refresh <package> --rebase    Rebase all patches onto new upstream"
+        echo "  ep build   <package> [--install] Build package, optionally install"
+        echo "  ep status  [package]             Show patch status"
+        echo ""
+        echo "Environment variables:"
+        echo "  WORK_DIR   Where source is fetched (default: ~/src)"
+        echo "  EDITOR     Editor for 'edit' command (default: nano)"
+        ;;
+    *)
+        echo "Unknown command: $CMD"
+        echo "Run: ep help"
+        exit 1
+        ;;
+esac
