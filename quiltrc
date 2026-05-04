@@ -1,0 +1,4 @@
+QUILT_PATCHES=patches
+QUILT_DIFF_ARGS="--color=auto"
+QUILT_REFRESH_ARGS="--no-timestamps --no-index"
+QUILT_PATCH_OPTS="--unified"

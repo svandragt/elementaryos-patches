@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCHES_DIR="$REPO_DIR"
 WORK_DIR="${2:-$HOME/src}"
 
@@ -54,7 +54,7 @@ echo "==> Linked patches: $PATCHES_DIR/$PACKAGE -> $SOURCE_DIR/patches"
 
 # Apply
 echo "==> Applying patches..."
-QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" -d "$SOURCE_DIR" push -a
+(cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" push -a)
 
 echo ""
 echo "==> All patches applied to $SOURCE_DIR"
