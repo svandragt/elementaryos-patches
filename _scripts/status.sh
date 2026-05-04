@@ -26,7 +26,7 @@ show_package() {
     SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" 2>/dev/null | sort -V | tail -1)
     if [[ -n "$SOURCE_DIR" ]]; then
         echo "  Source:  $(basename "$SOURCE_DIR")"
-        APPLIED=$(cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" applied 2>/dev/null | wc -l || echo "?")
+        APPLIED=$(cd "$SOURCE_DIR" && { QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" applied 2>/dev/null || true; } | wc -l)
         echo "  Applied: $APPLIED / $COUNT"
     else
         echo "  Source:  (not fetched)"
