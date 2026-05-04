@@ -15,43 +15,54 @@ bother me enough to maintain them locally.
 
 Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
-## Quick start
+## Install a patched package (end users)
 
-### 0. Install quilt (one time)
+If you just want a patched build of one of these packages on your own machine —
+no contributing, no patch authoring — this is the short path.
+
+### 1. Prerequisites (one time)
 
 ```bash
-sudo apt install quilt
+sudo apt install quilt git build-essential devscripts
 ```
 
-Quilt is the patch-stack manager all `ep` subcommands wrap. You'll also need
-`apt source` to work — make sure a `deb-src` line for the elementary archive is
-enabled in `/etc/apt/sources.list` (or `/etc/apt/sources.list.d/`), then run
-`sudo apt update`.
+`apt source` and `apt build-dep` need a `deb-src` line for the elementary
+archive enabled in `/etc/apt/sources.list` (or a file in
+`/etc/apt/sources.list.d/`). Then refresh:
 
-### 1. Clone this repo
+```bash
+sudo apt update
+```
+
+### 2. Clone and run
 
 ```bash
 git clone https://github.com/svandragt/elementary-patches.git
 cd elementary-patches
 chmod +x ep _scripts/*.sh
-```
+cat quiltrc >> ~/.quiltrc        # one time
 
-### 2. Set up quiltrc (one time)
-
-```bash
-cat quiltrc >> ~/.quiltrc
-```
-
-### 3. Apply patches and build a package
-
-```bash
-./ep apply io.elementary.notifications       # fetches source, applies all patches
+./ep apply io.elementary.notifications       # fetch source + apply patches
 ./ep build io.elementary.notifications --install
 ```
 
-That's it.
+`--install` runs `sudo dpkg -i` on the freshly built `.deb`. The unpatched
+upstream package will be replaced; remove it later with
+`sudo apt install --reinstall io.elementary.notifications` to revert.
 
-## Full command reference
+### Reverting
+
+```bash
+sudo apt install --reinstall io.elementary.notifications
+```
+
+That pulls the unpatched upstream version back from the archive.
+
+## Contributor workflow
+
+The end-user steps above already get you a working dev environment. From there:
+
+### Full command reference
 
 ```
 ep apply   <package>              Fetch source and apply all patches
@@ -63,7 +74,7 @@ ep build   <package> [--install]  Build package, optionally install it
 ep status  [package]              Show patch status
 ```
 
-## Adding a new patch
+### Adding a new patch
 
 ```bash
 ./ep apply   <package>                       # make sure source is ready
@@ -74,7 +85,7 @@ git add <package>/
 git commit -m "<package>: fix crash on startup"
 ```
 
-## Updating after a new upstream release
+### Updating after a new upstream release
 
 ```bash
 ./ep refresh io.elementary.notifications --rebase
@@ -83,7 +94,7 @@ git add io.elementary.notifications/
 git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 ```
 
-## Environment variables
+### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
