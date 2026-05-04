@@ -17,6 +17,17 @@ Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
 ## Quick start
 
+### 0. Install quilt (one time)
+
+```bash
+sudo apt install quilt
+```
+
+Quilt is the patch-stack manager all `ep` subcommands wrap. You'll also need
+`apt source` to work — make sure a `deb-src` line for the elementary archive is
+enabled in `/etc/apt/sources.list` (or `/etc/apt/sources.list.d/`), then run
+`sudo apt update`.
+
 ### 1. Clone this repo
 
 ```bash
