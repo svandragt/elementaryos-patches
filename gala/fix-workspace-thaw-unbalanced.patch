@@ -1,0 +1,29 @@
+--- gala-8.5.0+r3045+pkg130~ubuntu8.1.orig/src/Widgets/MultitaskingView/MultitaskingView.vala
++++ gala-8.5.0+r3045+pkg130~ubuntu8.1/src/Widgets/MultitaskingView/MultitaskingView.vala
+@@ -35,6 +35,8 @@
+ 
+     private List<MonitorClone> window_containers_monitors;
+ 
++    private bool switch_workspace_frozen = false;
++
+     private Widget workspaces;
+     private Clutter.Actor primary_monitor_container;
+     private Clutter.BrightnessContrastEffect brightness_effect;
+@@ -240,6 +242,7 @@
+ 
+         if (action == SWITCH_WORKSPACE) {
+             WorkspaceManager.get_default ().freeze_remove ();
++            switch_workspace_frozen = true;
+ 
+             var mru_window = InternalUtils.get_mru_window (display.get_workspace_manager ().get_active_workspace ());
+ 
+@@ -301,7 +304,8 @@
+             wm.pop_modal (modal_proxy);
+         }
+ 
+-        if (action == SWITCH_WORKSPACE) {
++        if (action == SWITCH_WORKSPACE && switch_workspace_frozen) {
++            switch_workspace_frozen = false;
+             WorkspaceManager.get_default ().thaw_remove ();
+             StaticWindowContainer.get_instance (display).notify_move_ended ();
+             display.get_workspace_manager ().notify_property ("n-workspaces"); //Recalc overshoot bounds

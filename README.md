@@ -12,6 +12,7 @@ bother me enough to maintain them locally.
 | Package | Patches | Description |
 |---------|---------|-------------|
 | [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11 |
+| [gala](gala/) | [series](gala/series) | Stop crash loop from unbalanced `WorkspaceManager.thaw_remove` when a workspace is added outside a swipe gesture |
 
 Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
