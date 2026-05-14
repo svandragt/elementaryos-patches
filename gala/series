@@ -1,1 +1,2 @@
 fix-workspace-thaw-unbalanced.patch
+fix-attention-focus-stealing.patch

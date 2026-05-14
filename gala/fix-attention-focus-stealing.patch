@@ -1,0 +1,25 @@
+Description: Force keyboard focus when raising a window that demands attention.
+ .
+ WindowAttentionTracker previously called activate_with_focus() with
+ display.get_current_time(), which returns the most recent X event
+ timestamp. When the currently focused window's _NET_WM_USER_TIME equals
+ that timestamp (e.g. the user was just typing in it), mutter's
+ focus-steal prevention denies the activation and the window is raised
+ but never receives keyboard focus. The result: the new window appears
+ on top, but keypresses still go to the previous window.
+ .
+ Use get_current_time_roundtrip() to obtain a fresh server timestamp
+ strictly newer than any prior input event, so the activation passes
+ mutter's focus-steal check.
+--- gala-8.5.1+r3055+pkg132~ubuntu8.1.orig/src/WindowAttentionTracker.vala
++++ gala-8.5.1+r3055+pkg132~ubuntu8.1/src/WindowAttentionTracker.vala
+@@ -10,7 +10,8 @@
+     }
+ 
+     private static void on_window_demands_attention (Meta.Window window) {
++        var timestamp = window.display.get_current_time_roundtrip ();
+         window.raise ();
+-        window.get_workspace ().activate_with_focus (window, window.display.get_current_time ());
++        window.get_workspace ().activate_with_focus (window, timestamp);
+     }
+ }
