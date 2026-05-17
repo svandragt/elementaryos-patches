@@ -1,0 +1,20 @@
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/Widgets/TerminalView.vala
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Widgets/TerminalView.vala
+@@ -73,6 +73,17 @@
+             view = tab_view,
+         };
+ 
++        var tab_bar_click = new Gtk.GestureClick () {
++            button = Gdk.BUTTON_PRIMARY
++        };
++        tab_bar_click.pressed.connect ((n_press, x, y) => {
++            if (n_press == 2) {
++                tab_bar_click.set_state (CLAIMED);
++                main_window.activate_action (MainWindow.ACTION_PREFIX + MainWindow.ACTION_NEW_TAB, null);
++            }
++        });
++        tab_bar.add_controller (tab_bar_click);
++
+         var overlay = new Gtk.Overlay () {
+             child = tab_view
+         };
