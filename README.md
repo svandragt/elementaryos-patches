@@ -14,6 +14,7 @@ bother me enough to maintain them locally.
 | [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11 |
 | [gala](gala/) | [series](gala/series) | Stop crash loop from unbalanced `WorkspaceManager.thaw_remove` when a workspace is added outside a swipe gesture; prevent focus-stealing on attention demand |
 | [io.elementary.terminal](io.elementary.terminal/) | [series](io.elementary.terminal/series) | Restore double-click on empty tab bar to open a new tab (GTK4 regression) |
+| [pantheon-files](pantheon-files/) | [series](pantheon-files/series) | Double-click on empty tab bar opens a new tab (matches terminal behavior) |
 | [appcenter](appcenter/) | [series](appcenter/series) | Don't show AppCenter in the dock with a "0" badge when there are no pending updates |
 
 Target: elementary OS 8 (Ubuntu 24.04 / noble).

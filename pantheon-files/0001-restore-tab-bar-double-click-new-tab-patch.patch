@@ -1,0 +1,19 @@
+--- pantheon-files-7.3.1+r6736+pkg143~ubuntu8.1.orig/src/View/Window.vala
++++ pantheon-files-7.3.1+r6736+pkg143~ubuntu8.1/src/View/Window.vala
+@@ -254,6 +254,16 @@
+             view = tab_view
+         };
+
++        var tab_bar_click = new Gtk.GestureMultiPress (tab_bar) {
++            button = Gdk.BUTTON_PRIMARY
++        };
++        tab_bar_click.pressed.connect ((n_press, x, y) => {
++            if (n_press == 2) {
++                tab_bar_click.set_state (CLAIMED);
++                activate_action ("tab", new Variant.string ("NEW"));
++            }
++        });
++
+         var tab_box = new Gtk.Box (VERTICAL, 0);
+         tab_box.add (tab_bar);
+         tab_box.add (tab_view);
