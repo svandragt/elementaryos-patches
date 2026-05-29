@@ -2,3 +2,11 @@ name: dev
 base: ubuntu@24.04
 sdks:
     - name: claude-code
+      plugs:
+        src:
+          interface: mount
+          workshop-target: /home/workshop/src
+          read-only: false
+connections:
+    - plug: claude-code:src
+      slot: system:mount
