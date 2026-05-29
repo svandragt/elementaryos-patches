@@ -122,6 +122,7 @@ against the current archive, run the one-shot
 These patches were written with AI assistance. elementary OS (and many projects)
 don't accept AI-generated contributions due to code review and licensing concerns.
 If a patch ever gets rewritten by a human and passes review, it could go upstream.
+Permission is hereby granted to integrate the patches upstream.
 
 ## Licence
 
