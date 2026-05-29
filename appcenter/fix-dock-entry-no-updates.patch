@@ -1,0 +1,50 @@
+Description: Don't register a Unity launcher entry when there are no updates.
+ .
+ UpdateManager.update_badge() unconditionally called
+ Granite.Services.Application.set_badge() on every items-changed signal
+ from the FlatpakBackend update model, including the first emission at
+ daemon startup when the list is empty. The first call to set_badge() /
+ set_badge_visible() lazily constructs Granite's UnityLauncherEntry
+ singleton, which registers a DBus object on the session bus and emits
+ com.canonical.Unity.LauncherEntry.Update. The elementary Dock treats
+ that as a transient launcher and shows AppCenter in the dock — with a
+ visible "0" badge, because set_badge(0) lands a DBus round-trip before
+ the subsequent set_badge_visible(false).
+ .
+ Skip both calls entirely when the count is zero and we have not yet
+ registered an entry, so a cold start with no pending updates leaves no
+ launcher entry behind. Once an entry has been registered (because the
+ count was previously non-zero), keep calling set_badge_visible(false)
+ on transitions back to zero so the badge clears properly. Also reorder
+ the two calls in the non-zero path: hide-or-show first, then update
+ the count, so observers never see a stale count=0 with count-visible
+ toggling on.
+--- appcenter-8.4.0+r5420+pkg137~ubuntu8.1.orig/src/Core/UpdateManager.vala
++++ appcenter-8.4.0+r5420+pkg137~ubuntu8.1/src/Core/UpdateManager.vala
+@@ -41,6 +41,8 @@
+         }
+     }
+ 
++    private bool badge_initialized = false;
++
+     private GLib.DateTime last_refresh_time;
+     private bool refresh_required = false;
+     private uint refresh_timeout_id = 0;
+@@ -73,9 +75,16 @@
+     private async void update_badge () {
+         var n_updatable_packages = FlatpakBackend.get_default ().updatable_packages.get_n_items ();
+ 
++        if (n_updatable_packages == 0 && !badge_initialized) {
++            return;
++        }
++
+         try {
+-            yield Granite.Services.Application.set_badge (n_updatable_packages);
+             yield Granite.Services.Application.set_badge_visible (n_updatable_packages != 0);
++            if (n_updatable_packages > 0) {
++                yield Granite.Services.Application.set_badge (n_updatable_packages);
++            }
++            badge_initialized = true;
+         } catch (Error e) {
+             warning ("Error setting updates badge: %s", e.message);
+         }
