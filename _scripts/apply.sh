@@ -44,6 +44,21 @@ fi
 
 echo "==> Source directory: $SOURCE_DIR"
 
+# Verified-against version check
+CURRENT_VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
+VERIFIED_FILE="$PATCHES_DIR/$PACKAGE/VERIFIED"
+if [[ -f "$VERIFIED_FILE" ]]; then
+    VERIFIED_VERSION="$(head -n1 "$VERIFIED_FILE" | tr -d '[:space:]')"
+    if [[ "$VERIFIED_VERSION" != "$CURRENT_VERSION" ]]; then
+        echo "==> WARNING: patches last verified against $VERIFIED_VERSION, applying against $CURRENT_VERSION"
+        echo "    Review the result and run 'ep refresh $PACKAGE --rebase' to re-bless."
+    else
+        echo "==> Verified against $VERIFIED_VERSION"
+    fi
+else
+    echo "==> No VERIFIED file yet for $PACKAGE (run 'ep refresh' to record $CURRENT_VERSION)"
+fi
+
 # Remove any existing .pc state and patches symlink
 rm -rf "$SOURCE_DIR/.pc"
 rm -f "$SOURCE_DIR/patches"

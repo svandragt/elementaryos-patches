@@ -97,6 +97,19 @@ git add io.elementary.notifications/
 git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 ```
 
+### Verified-against version
+
+Each package directory contains (or will contain after the next refresh) a
+`VERIFIED` file recording the upstream version the patch series was last
+refreshed against. It's a breadcrumb, not a lock — `ep apply` still pulls
+whatever `apt source` currently ships, but it warns when that version differs
+from the recorded one so you know to eyeball the result. `ep refresh` rewrites
+`VERIFIED` on success.
+
+To record `VERIFIED` for every package whose patches already apply cleanly
+against the current archive, run the one-shot
+`./_scripts/backfill-verified.sh` (optionally pass package names to limit it).
+
 ### Environment variables
 
 | Variable | Default | Description |

@@ -74,3 +74,8 @@ else
     (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" refresh)
     echo "==> Done. Patch updated in $REPO_DIR/$PACKAGE/"
 fi
+
+# Record verified-against version
+VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
+echo "$VERSION" > "$REPO_DIR/$PACKAGE/VERIFIED"
+echo "==> Recorded verified version: $VERSION"
