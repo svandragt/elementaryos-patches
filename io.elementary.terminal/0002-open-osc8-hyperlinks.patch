@@ -1,0 +1,16 @@
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/Widgets/TerminalWidget.vala
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Widgets/TerminalWidget.vala
+@@ -965,6 +965,13 @@
+         }
+ 
+         private string? get_link (double x, double y) {
++            // OSC 8 hyperlinks (explicit URIs set by applications) take
++            // precedence over regex-matched plain text URIs.
++            var uri = check_hyperlink_at (x, y);
++            if (uri != null) {
++                return uri;
++            }
++
+             return check_match_at (x, y, null);
+         }
+ 
