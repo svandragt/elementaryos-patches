@@ -1,8 +1,8 @@
 --- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/Widgets/TerminalView.vala
 +++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Widgets/TerminalView.vala
-@@ -84,6 +84,17 @@
-         });
-         tab_bar.add_controller (tab_bar_click);
+@@ -73,6 +73,17 @@
+             view = tab_view,
+         };
  
 +        var tab_bar_click = new Gtk.GestureClick () {
 +            button = Gdk.BUTTON_PRIMARY
