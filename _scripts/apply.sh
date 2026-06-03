@@ -32,17 +32,28 @@ fi
 
 mkdir -p "$WORK_DIR"
 
-# Find or fetch source
-SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" 2>/dev/null | sort -V | tail -1)
+# Fetch latest source files (cached in WORK_DIR, cheap if current)
+echo "==> Fetching source for $PACKAGE..."
+(cd "$WORK_DIR" && apt source --download-only "$PACKAGE")
 
-if [[ -z "$SOURCE_DIR" ]]; then
-    echo "==> Fetching source for $PACKAGE..."
-    cd "$WORK_DIR"
-    apt source "$PACKAGE"
-    SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" | sort -V | tail -1)
+DSC=$(find "$WORK_DIR" -maxdepth 1 -name "${PACKAGE}_*.dsc" 2>/dev/null | sort -V | tail -1)
+if [[ -z "$DSC" ]]; then
+    echo "Error: no .dsc found for $PACKAGE in $WORK_DIR"
+    exit 1
 fi
 
-echo "==> Source directory: $SOURCE_DIR"
+# Re-extract pristine: pushing onto an already-patched tree (with no .pc)
+# can double-apply additive patches. Discards any edits in the old tree.
+VERSION="${DSC##*_}"; VERSION="${VERSION%.dsc}"
+UPSTREAM="${VERSION%-*}"; UPSTREAM="${UPSTREAM#*:}"
+SOURCE_DIR="$WORK_DIR/${PACKAGE}-${UPSTREAM}"
+if [[ -d "$SOURCE_DIR" ]]; then
+    echo "==> Removing existing tree for pristine re-extract: $SOURCE_DIR"
+    rm -rf "$SOURCE_DIR"
+fi
+(cd "$WORK_DIR" && dpkg-source -x "$(basename "$DSC")")
+
+echo "==> Source directory: $SOURCE_DIR (pristine)"
 
 # Verified-against version check
 CURRENT_VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
