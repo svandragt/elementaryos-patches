@@ -75,6 +75,9 @@ ep edit    <package> <file>       Add a file to current patch and open editor
 ep refresh <package>              Refresh top patch after editing
 ep refresh <package> --rebase     Rebase all patches onto new upstream version
 ep build   <package> [--install]  Build package, optionally install it
+ep rebuild <package>|--all        Fetch latest source, re-apply patches, build and install
+                                  (--no-install to only build, --force to ignore the
+                                  up-to-date check)
 ep status  [package]              Show patch status
 ```
 
@@ -91,12 +94,36 @@ git commit -m "<package>: fix crash on startup"
 
 ### Updating after a new upstream release
 
+The one-command path — rebuilds every patched package against whatever the
+archive currently ships:
+
+```bash
+./ep rebuild --all
+```
+
+Per package it fetches the latest source, re-extracts it pristine, re-applies
+the series (auto-refreshing patches that land with offsets/fuzz), updates
+`VERIFIED`, builds and installs. Pass `--no-install` to only build.
+
+Builds can take a while, so each successful rebuild+install stamps
+`$WORK_DIR/.ep-built-<package>` with the source version and a hash of the
+patch series. While both are unchanged the package is reported as up to date
+and skipped — so `ep rebuild --all` is cheap to re-run. Pass `--force` to
+rebuild anyway. (The installed version can't be used for this check: a locally
+built `.deb` has the same version as the stock archive package.)
+
+A patch that fails outright skips that package and the summary lists it for a
+manual rebase:
+
 ```bash
 ./ep refresh io.elementary.notifications --rebase
 # Fix any failures (quilt will stop and tell you)
 git add io.elementary.notifications/
 git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 ```
+
+After a `rebuild` that refreshed patches, review and commit the changed
+`.patch` files the same way.
 
 ### Verified-against version
 
