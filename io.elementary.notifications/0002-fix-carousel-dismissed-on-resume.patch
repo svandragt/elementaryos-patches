@@ -1,0 +1,67 @@
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/AbstractBubble.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/AbstractBubble.vala
+@@ -44,6 +44,7 @@
+     private Gtk.Overlay overlay;
+ 
+     private uint timeout_id;
++    private uint realize_retry_count = 0;
+ 
+     private double current_swipe_progress = 1.0;
+     private Pantheon.Desktop.Shell? desktop_shell;
+@@ -93,7 +94,6 @@
+         };
+         carousel.append (new Gtk.Grid ());
+         carousel.append (overlay);
+-        carousel.scroll_to (overlay, false);
+ 
+         child = carousel;
+         default_width = 332;
+@@ -115,6 +115,9 @@
+         accessible_role = ALERT;
+ 
+         child.realize.connect (() => {
++            // scroll_to before realization is a no-op (no widget size yet); do it
++            // here so the carousel is at the overlay page before the window maps
++            carousel.scroll_to (overlay, false);
+             if (Gdk.Display.get_default () is Gdk.Wayland.Display) {
+                 //  We have to wrap in Idle otherwise the Meta.Window of the WaylandSurface in Gala is still null
+                 Idle.add_once (init_wl);
+@@ -139,6 +142,10 @@
+     }
+ 
+     private void on_page_changed (Adw.Carousel carousel, uint index) {
++        if (!get_mapped ()) {
++            return;
++        }
++
+         if (carousel.get_nth_page (index) != overlay) {
+             closed (CloseReason.DISMISSED);
+         }
+@@ -166,9 +173,25 @@
+         }
+ 
+         if (Gdk.Display.get_default () is Gdk.X11.Display) {
+-            // Avoid present on X11 because it focuses the window
+-            // Realize first so we can set the window type atom before the WM sees it
++            // Avoid present on X11 because it focuses the window.
++            // Realize first so we can set the window type atom before the WM sees it.
+             realize ();
++            // After sleep/resume the compositor may not have a frame clock ready yet,
++            // causing realize() to silently produce a surface with no frame clock.
++            // Detect this and retry until the compositor is ready (up to ~4 s).
++            var native_surface = ((Gtk.Native) this).get_surface ();
++            if (native_surface == null || native_surface.get_frame_clock () == null) {
++                unrealize ();
++                if (realize_retry_count < 20) {
++                    realize_retry_count++;
++                    Timeout.add (200, () => {
++                        present ();
++                        return Source.REMOVE;
++                    });
++                }
++                return;
++            }
++            realize_retry_count = 0;
+             base.show ();
+         } else {
+             base.present ();

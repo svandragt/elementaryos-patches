@@ -11,7 +11,7 @@ bother me enough to maintain them locally.
 
 | Package | Patches | Description |
 |---------|---------|-------------|
-| [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11 |
+| [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11; fix notifications silently dropped after sleep/resume (GDK frame clock not ready, retry until compositor is up) |
 | [gala](gala/) | [series](gala/series) | Stop crash loop from unbalanced `WorkspaceManager.thaw_remove` when a workspace is added outside a swipe gesture; prevent focus-stealing on attention demand |
 | [io.elementary.terminal](io.elementary.terminal/) | [series](io.elementary.terminal/series) | Restore double-click on empty tab bar to open a new tab (GTK4 regression); open OSC 8 hyperlinks on ctrl-click |
 | [pantheon-files](pantheon-files/) | [series](pantheon-files/series) | Double-click on empty tab bar opens a new tab (matches terminal behavior) |
