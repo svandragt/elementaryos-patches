@@ -57,6 +57,8 @@ type Occurrence struct {
 	PID        int       `json:"pid"`
 	UID        int       `json:"uid"`
 	Backtrace  string    `json:"backtrace"`
+	Journal    string    `json:"journal,omitempty"`
+	Package    string    `json:"package,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +84,19 @@ CREATE TABLE IF NOT EXISTS occurrences (
 	occurred_at INTEGER NOT NULL,
 	pid INTEGER NOT NULL DEFAULT 0,
 	uid INTEGER NOT NULL DEFAULT 0,
-	backtrace TEXT NOT NULL DEFAULT ''
+	backtrace TEXT NOT NULL DEFAULT '',
+	journal TEXT NOT NULL DEFAULT '',
+	package TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_occurrences_issue ON occurrences(issue_id);
 `
+
+// migrations are ALTERs for databases created before a column existed;
+// "duplicate column name" errors mean the column is already there.
+var migrations = []string{
+	`ALTER TABLE occurrences ADD COLUMN journal TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE occurrences ADD COLUMN package TEXT NOT NULL DEFAULT ''`,
+}
 
 type Store struct {
 	db *sql.DB
@@ -104,6 +115,12 @@ func openStore(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
+	for _, m := range migrations {
+		if _, err := db.Exec(m); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			db.Close()
+			return nil, fmt.Errorf("migrate schema: %w", err)
+		}
+	}
 	return &Store{db: db}, nil
 }
 
@@ -112,7 +129,7 @@ func (s *Store) Close() error { return s.db.Close() }
 // recordCrash inserts a new occurrence (ignored if sourceKey already exists)
 // and creates or updates the issue it belongs to. Returns true if a new
 // occurrence was actually recorded.
-func (s *Store) recordCrash(exe, signal, topFrame, sourceKey, source string, at time.Time, pid, uid int, backtrace string) (bool, error) {
+func (s *Store) recordCrash(exe, signal, topFrame, sourceKey, source string, at time.Time, pid, uid int, backtrace, journal, pkg string) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return false, err
@@ -122,9 +139,9 @@ func (s *Store) recordCrash(exe, signal, topFrame, sourceKey, source string, at 
 	id := fingerprint(exe, signal, topFrame)
 
 	res, err := tx.Exec(
-		`INSERT OR IGNORE INTO occurrences (issue_id, source_key, source, occurred_at, pid, uid, backtrace)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, sourceKey, source, at.Unix(), pid, uid, backtrace,
+		`INSERT OR IGNORE INTO occurrences (issue_id, source_key, source, occurred_at, pid, uid, backtrace, journal, package)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, sourceKey, source, at.Unix(), pid, uid, backtrace, journal, pkg,
 	)
 	if err != nil {
 		return false, err
@@ -210,7 +227,7 @@ func (s *Store) getIssue(id string) (Issue, error) {
 
 func (s *Store) listOccurrences(issueID string) ([]Occurrence, error) {
 	rows, err := s.db.Query(
-		`SELECT id, issue_id, source_key, source, occurred_at, pid, uid, backtrace
+		`SELECT id, issue_id, source_key, source, occurred_at, pid, uid, backtrace, journal, package
 		 FROM occurrences WHERE issue_id = ? ORDER BY occurred_at DESC LIMIT 25`, issueID,
 	)
 	if err != nil {
@@ -221,7 +238,7 @@ func (s *Store) listOccurrences(issueID string) ([]Occurrence, error) {
 	for rows.Next() {
 		var o Occurrence
 		var at int64
-		if err := rows.Scan(&o.ID, &o.IssueID, &o.SourceKey, &o.Source, &at, &o.PID, &o.UID, &o.Backtrace); err != nil {
+		if err := rows.Scan(&o.ID, &o.IssueID, &o.SourceKey, &o.Source, &at, &o.PID, &o.UID, &o.Backtrace, &o.Journal, &o.Package); err != nil {
 			return nil, err
 		}
 		o.OccurredAt = time.Unix(at, 0)
@@ -383,7 +400,9 @@ func pollCoredumpctl(ctx context.Context, store *Store, known map[string]bool) {
 		if exe == "" {
 			exe = "(unknown executable)"
 		}
-		created, err := store.recordCrash(exe, sig, top, sourceKey, "coredumpctl", occurredAt, pid, uid, backtrace)
+		journal := journalContext(ctx, pid, occurredAt)
+		pkg := packageOf(ctx, exe)
+		created, err := store.recordCrash(exe, sig, top, sourceKey, "coredumpctl", occurredAt, pid, uid, backtrace, journal, pkg)
 		if err != nil {
 			log.Printf("coredumpctl: record crash: %v", err)
 			continue
@@ -394,11 +413,40 @@ func pollCoredumpctl(ctx context.Context, store *Store, known map[string]bool) {
 	}
 }
 
+// gdbScript is the batch command file passed to gdb via coredumpctl debug.
+// debuginfod resolves symbols from Ubuntu's server so frames get function
+// names and source lines even without local -dbgsym packages installed.
+const gdbScript = `set debuginfod enabled on
+set pagination off
+echo \n=== crashing thread ===\n
+bt
+echo \n=== all threads (full) ===\n
+thread apply all bt full
+echo \n=== registers ===\n
+info registers
+`
+
 func debugBacktrace(ctx context.Context, pid int) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	// symbol downloads over debuginfod can be slow on first sight of a binary
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
+
+	script, err := os.CreateTemp("", "crash-dashboard-gdb-*.gdb")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(script.Name())
+	if _, err := script.WriteString(gdbScript); err != nil {
+		script.Close()
+		return "", err
+	}
+	script.Close()
+
 	cmd := exec.CommandContext(ctx, "coredumpctl", "debug", "--no-pager", "-1",
-		"-A", "-batch -ex bt", strconv.Itoa(pid))
+		"-A", "-batch -x "+script.Name(), strconv.Itoa(pid))
+	if os.Getenv("DEBUGINFOD_URLS") == "" {
+		cmd.Env = append(os.Environ(), "DEBUGINFOD_URLS=https://debuginfod.ubuntu.com")
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if len(out) > 0 {
@@ -407,6 +455,58 @@ func debugBacktrace(ctx context.Context, pid int) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+// journalContext gathers the crashed process's own log lines plus system-wide
+// journal messages from the 30s leading up to the crash — Gtk warnings or
+// criticals just before a segfault are often the real clue.
+func journalContext(ctx context.Context, pid int, at time.Time) string {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var b strings.Builder
+	pidOut, err := exec.CommandContext(ctx, "journalctl", "--no-pager", "-q",
+		"-o", "short-iso", "-n", "40", "_PID="+strconv.Itoa(pid)).Output()
+	if err == nil && len(pidOut) > 0 {
+		b.WriteString("=== process log (last 40 lines) ===\n")
+		b.Write(pidOut)
+	}
+
+	const layout = "2006-01-02 15:04:05"
+	winOut, err := exec.CommandContext(ctx, "journalctl", "--no-pager", "-q",
+		"-o", "short-iso", "-p", "warning",
+		"--since", at.Add(-30*time.Second).Format(layout),
+		"--until", at.Add(5*time.Second).Format(layout)).Output()
+	if err == nil && len(winOut) > 0 {
+		b.WriteString("\n=== system warnings around crash (-30s..+5s) ===\n")
+		b.Write(winOut)
+	}
+	return b.String()
+}
+
+// packageOf resolves which Debian package owns the executable and its
+// installed version, so a crash can be tied to a specific (possibly locally
+// patched) build.
+func packageOf(ctx context.Context, exe string) string {
+	if exe == "" || !strings.HasPrefix(exe, "/") {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "dpkg", "-S", exe).Output()
+	if err != nil {
+		return ""
+	}
+	pkg, _, ok := strings.Cut(firstLine(string(out)), ":")
+	if !ok || pkg == "" {
+		return ""
+	}
+	ver, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f", "${Version}", pkg).Output()
+	if err != nil {
+		return pkg
+	}
+	return pkg + " " + strings.TrimSpace(string(ver))
 }
 
 func firstLine(s string) string {
@@ -532,7 +632,20 @@ func pollApport(store *Store, known map[string]bool) {
 			}
 		}
 
-		created, err := store.recordCrash(exe, sig, top, sourceKey, "apport", occurredAt, pid, uid, backtrace)
+		// Apport reports carry package/version and process context inline.
+		pkg := strings.TrimSpace(fields["Package"])
+		var extra []string
+		for _, k := range []string{"ProcCmdline", "ProblemType", "Dependencies"} {
+			if v := fields[k]; v != "" {
+				if k == "Dependencies" {
+					v = firstLine(v) + " ..."
+				}
+				extra = append(extra, k+": "+v)
+			}
+		}
+		journal := strings.Join(extra, "\n")
+
+		created, err := store.recordCrash(exe, sig, top, sourceKey, "apport", occurredAt, pid, uid, backtrace, journal, pkg)
 		if err != nil {
 			log.Printf("apport: record crash: %v", err)
 			continue
@@ -630,7 +743,7 @@ func seedDemoData(store *Store) error {
 		for i := 0; i < d.count; i++ {
 			at := last.Add(-time.Duration(i) * time.Hour)
 			sourceKey := fmt.Sprintf("demo:%s:%d", d.exe, i)
-			if _, err := store.recordCrash(d.exe, d.sig, top, sourceKey, "demo", at, 1000+i, 1000, d.backtrace); err != nil {
+			if _, err := store.recordCrash(d.exe, d.sig, top, sourceKey, "demo", at, 1000+i, 1000, d.backtrace, "", ""); err != nil {
 				return err
 			}
 		}
@@ -681,8 +794,8 @@ type indexData struct {
 }
 
 type occurrenceView struct {
-	Source, When, Backtrace string
-	PID, UID                int
+	Source, When, Backtrace, Journal, Package string
+	PID, UID                                  int
 }
 
 type issueDetail struct {
@@ -733,8 +846,9 @@ var issueTmpl = template.Must(template.New("issue").Parse(`<!doctype html>
 <h3>Recent occurrences</h3>
 {{range .Occurrences}}
 <div class="occ">
-<div class="head">{{.When}} &middot; source={{.Source}} &middot; pid={{.PID}} uid={{.UID}}</div>
+<div class="head">{{.When}} &middot; source={{.Source}} &middot; pid={{.PID}} uid={{.UID}}{{if .Package}} &middot; {{.Package}}{{end}}</div>
 <pre>{{.Backtrace}}</pre>
+{{if .Journal}}<details><summary class="head">journal / process context</summary><pre>{{.Journal}}</pre></details>{{end}}
 </div>
 {{else}}
 <div class="empty">No occurrence detail recorded.</div>
@@ -800,6 +914,7 @@ func newServer(store *Store) http.Handler {
 		for _, o := range occs {
 			occViews = append(occViews, occurrenceView{
 				Source: o.Source, When: humanTime(o.OccurredAt), Backtrace: o.Backtrace,
+				Journal: o.Journal, Package: o.Package,
 				PID: o.PID, UID: o.UID,
 			})
 		}
