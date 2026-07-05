@@ -58,6 +58,8 @@ counted and grouped by executable name. Crashes still visible to
 
 - `coredumpctl` needs permission to read the coredump (root, or a user in
   a group with journal/coredump ACLs).
+- Under `sudo`, the default `-db` path resolves via `$SUDO_USER` to the
+  invoking user's home, so plain and sudo runs share one database.
 - `/var/crash/*.crash` files written by Apport are typically root-owned
   (mode 0600). Run the binary as root for full Apport coverage; without
   root it silently skips files it can't read.

@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -1161,7 +1162,15 @@ func callMCPTool(store *Store, name string, rawArgs json.RawMessage) (string, er
 // main
 // ---------------------------------------------------------------------------
 
+// defaultDBPath picks the database location. Under sudo it resolves to the
+// invoking user's home instead of root's, so `./crash-dashboard` and
+// `sudo ./crash-dashboard` share one database by default.
 func defaultDBPath() string {
+	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" && os.Geteuid() == 0 {
+		if u, err := user.Lookup(sudoUser); err == nil && u.HomeDir != "" {
+			return filepath.Join(u.HomeDir, ".local", "share", "crash-dashboard", "crashes.db")
+		}
+	}
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
 		return filepath.Join(xdg, "crash-dashboard", "crashes.db")
 	}
