@@ -8,6 +8,8 @@ Target platform: **elementary OS 8** (Ubuntu 24.04 base). Source packages are pu
 
 Personal quilt-style patch series for elementary OS Debian source packages. Each top-level directory named after a package (e.g. `io.elementary.notifications/`) holds a `series` file plus numbered `.patch` files in standard quilt format. Patches are AI-assisted and intentionally kept out of upstream — they live here for local rebuilds.
 
+Underscore-prefixed directories are tooling, not patch series: `_scripts/` holds the `ep` helper scripts, and `_crash-dashboard/` is a standalone Go binary (Sentry-style local crash dashboard over coredumpctl/Apport, with a web UI and an `-mcp` stdio mode for assistant-driven triage — see its README). Build with `go build` inside that directory; don't add a `series` file there.
+
 elementary OS does not accept AI-generated contributions, so do not propose pushing patches upstream.
 
 ## Workflow

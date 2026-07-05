@@ -19,6 +19,15 @@ bother me enough to maintain them locally.
 
 Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| [_crash-dashboard](_crash-dashboard/) | Sentry-style POC crash dashboard: single Go binary that collects crashes from `coredumpctl` and Apport, groups them into issues with stack traces, and serves a localhost web UI. Also runs as a minimal MCP server (`-mcp`) so an AI assistant can list, inspect, and resolve reported crashes. See its [README](_crash-dashboard/README.md). |
+
+Underscore-prefixed directories (`_scripts/`, `_crash-dashboard/`) are
+tooling, not patch series — `ep` skips them.
+
 ## Install a patched package (end users)
 
 If you just want a patched build of one of these packages on your own machine —
