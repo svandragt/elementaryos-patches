@@ -66,6 +66,45 @@ counted and grouped by executable name. Crashes still visible to
   (mode 0600). Run the binary as root for full Apport coverage; without
   root it silently skips files it can't read.
 
+## Running persistently (systemd user service)
+
+Crash collection only happens while the dashboard process is running —
+there's no separate daemon or timer. Running `-mcp` mode alone does
+**not** collect anything; it only reads whatever's already in the
+database. To collect crashes continuously in the background, run the
+web dashboard as a systemd user service:
+
+```ini
+# ~/.config/systemd/user/crash-dashboard.service
+[Unit]
+Description=Crash dashboard (coredumpctl/Apport collector + web UI)
+After=default.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart="/path/to/crash-dashboard"
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crash-dashboard
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now crash-dashboard.service
+```
+
+Memory footprint is a few MB (SQLite + a 10s poll ticker), negligible
+for an always-on background service. If your journal/coredump ACLs
+grant your user group (e.g. `adm`) read access, this runs fine without
+root; root is only needed for Apport files in `/var/crash`.
+
 ## MCP: let an assistant fix reported crashes
 
 `-mcp` runs the same binary as a minimal MCP server over stdio (JSON-RPC
