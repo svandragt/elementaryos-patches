@@ -620,7 +620,7 @@ func pollCoredumpDir(store *Store, known map[string]bool) {
 
 		backtrace := "(recovered from " + coredumpDir + "; journal entry expired, no backtrace available)"
 		created, err := store.recordCrash(comm, "(unknown signal)", "(no backtrace)",
-			sourceKey, "coredumpdir", occurredAt, pid, uid, backtrace)
+			sourceKey, "coredumpdir", occurredAt, pid, uid, backtrace, "", "")
 		if err != nil {
 			log.Printf("coredumpdir: record crash: %v", err)
 			continue
