@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -52,7 +53,7 @@ type Occurrence struct {
 	ID         int64     `json:"id"`
 	IssueID    string    `json:"issue_id"`
 	SourceKey  string    `json:"source_key"`
-	Source     string    `json:"source"` // "coredumpctl" | "apport" | "demo"
+	Source     string    `json:"source"` // "coredumpctl" | "coredumpdir" | "apport" | "demo"
 	OccurredAt time.Time `json:"occurred_at"`
 	PID        int       `json:"pid"`
 	UID        int       `json:"uid"`
@@ -569,6 +570,118 @@ func parseCoredumpTime(v any) time.Time {
 		}
 	}
 	return time.Now()
+}
+
+// ---------------------------------------------------------------------------
+// coredump directory collector
+//
+// coredumpctl only lists crashes whose metadata is still in the journal; once
+// journald rotation vacuums those entries, the core files themselves remain in
+// /var/lib/systemd/coredump but become invisible to coredumpctl. This
+// collector recovers them from the filenames, which encode
+// core.<comm>.<uid>.<bootid>.<pid>.<usec>[.zst|.lz4|.xz]. No signal or
+// backtrace is available without the journal entry, so those are recorded as
+// unknown; the point is that the crash still shows up and is counted.
+// ---------------------------------------------------------------------------
+
+const coredumpDir = "/var/lib/systemd/coredump"
+
+var compressExts = map[string]bool{".zst": true, ".lz4": true, ".xz": true}
+
+func pollCoredumpDir(store *Store, known map[string]bool) {
+	entries, err := os.ReadDir(coredumpDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, os.ErrPermission) {
+			log.Printf("coredumpdir: read %s: %v", coredumpDir, err)
+		}
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		comm, uid, pid, occurredAt, ok := parseCoredumpFilename(entry.Name())
+		if !ok {
+			continue
+		}
+		sourceKey := fmt.Sprintf("coredumpdir:%d:%d:%s", pid, occurredAt.UnixMicro(), comm)
+		if known[sourceKey] {
+			continue
+		}
+		// Skip crashes already ingested via coredumpctl (journal entry still
+		// alive). Its keys are "coredumpctl:<pid>:<usec>:<exe>"; exe differs
+		// from comm and the filename timestamp only has second granularity,
+		// so match on pid plus timestamp truncated to seconds.
+		if hasCoredumpctlKey(known, pid, occurredAt) {
+			continue
+		}
+		known[sourceKey] = true
+
+		backtrace := "(recovered from " + coredumpDir + "; journal entry expired, no backtrace available)"
+		created, err := store.recordCrash(comm, "(unknown signal)", "(no backtrace)",
+			sourceKey, "coredumpdir", occurredAt, pid, uid, backtrace)
+		if err != nil {
+			log.Printf("coredumpdir: record crash: %v", err)
+			continue
+		}
+		if created {
+			log.Printf("coredumpdir: recovered crash exe=%s pid=%d at=%s", comm, pid, occurredAt.Format(time.RFC3339))
+		}
+	}
+}
+
+// hasCoredumpctlKey reports whether a coredumpctl occurrence with the same
+// pid and second-truncated timestamp is already known.
+func hasCoredumpctlKey(known map[string]bool, pid int, at time.Time) bool {
+	for k := range known {
+		rest, ok := strings.CutPrefix(k, "coredumpctl:")
+		if !ok {
+			continue
+		}
+		fields := strings.SplitN(rest, ":", 3)
+		if len(fields) < 2 {
+			continue
+		}
+		kpid, err1 := strconv.Atoi(fields[0])
+		kusec, err2 := strconv.ParseInt(fields[1], 10, 64)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		if kpid == pid && kusec/1e6 == at.Unix() {
+			return true
+		}
+	}
+	return false
+}
+
+// parseCoredumpFilename parses systemd-coredump's on-disk name:
+// core.<comm>.<uid>.<bootid>.<pid>.<usec>[.<compression ext>].
+// comm may itself contain dots, so the trailing fields are taken from the
+// right.
+func parseCoredumpFilename(name string) (comm string, uid, pid int, at time.Time, ok bool) {
+	if !strings.HasPrefix(name, "core.") {
+		return "", 0, 0, time.Time{}, false
+	}
+	parts := strings.Split(name, ".")
+	if compressExts["."+parts[len(parts)-1]] {
+		parts = parts[:len(parts)-1]
+	}
+	// core / comm... / uid / bootid / pid / usec
+	if len(parts) < 6 {
+		return "", 0, 0, time.Time{}, false
+	}
+	usec, err1 := strconv.ParseInt(parts[len(parts)-1], 10, 64)
+	pid, err2 := strconv.Atoi(parts[len(parts)-2])
+	uid, err3 := strconv.Atoi(parts[len(parts)-4])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return "", 0, 0, time.Time{}, false
+	}
+	comm = strings.Join(parts[1:len(parts)-4], ".")
+	if comm == "" {
+		comm = "(unknown executable)"
+	}
+	return comm, uid, pid, time.UnixMicro(usec), true
 }
 
 // ---------------------------------------------------------------------------
@@ -1164,7 +1277,15 @@ func callMCPTool(store *Store, name string, rawArgs json.RawMessage) (string, er
 // main
 // ---------------------------------------------------------------------------
 
+// defaultDBPath picks the database location. Under sudo it resolves to the
+// invoking user's home instead of root's, so `./crash-dashboard` and
+// `sudo ./crash-dashboard` share one database by default.
 func defaultDBPath() string {
+	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" && os.Geteuid() == 0 {
+		if u, err := user.Lookup(sudoUser); err == nil && u.HomeDir != "" {
+			return filepath.Join(u.HomeDir, ".local", "share", "crash-dashboard", "crashes.db")
+		}
+	}
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
 		return filepath.Join(xdg, "crash-dashboard", "crashes.db")
 	}
@@ -1227,6 +1348,7 @@ func main() {
 			if haveCoredumpctl {
 				pollCoredumpctl(ctx, store, known)
 			}
+			pollCoredumpDir(store, known)
 			pollApport(store, known)
 			select {
 			case <-ctx.Done():

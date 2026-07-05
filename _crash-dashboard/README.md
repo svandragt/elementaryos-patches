@@ -1,8 +1,9 @@
 # crash-dashboard
 
 A proof-of-concept, Sentry-style crash dashboard for a personal Linux
-machine. Single Go binary, no cgo. Polls `coredumpctl` (systemd-coredump)
-and `/var/crash` (Apport) for new crashes, groups repeats into "issues" by
+machine. Single Go binary, no cgo. Polls `coredumpctl` (systemd-coredump),
+the `/var/lib/systemd/coredump` directory itself, and `/var/crash`
+(Apport) for new crashes, groups repeats into "issues" by
 executable + signal + top stack frame, and serves a small web UI. Also
 speaks a minimal MCP so an AI assistant can query and resolve crashes
 directly.
@@ -41,10 +42,24 @@ Flags:
 | `-demo` | off | Seed sample issues if the database is empty |
 | `-mcp` | off | Run as an MCP server over stdio instead of the web dashboard |
 
+### Recovering crashes the journal has forgotten
+
+`coredumpctl` only lists crashes whose metadata is still in the journal.
+With capped journal retention (e.g. `SystemMaxUse=500M`), rotation deletes
+those entries while the compressed core files stay behind in
+`/var/lib/systemd/coredump`. The dashboard therefore also scans that
+directory and recovers crashes from the filenames
+(`core.<comm>.<uid>.<bootid>.<pid>.<usec>[.zst]`). Recovered entries have
+no signal or backtrace (that lived in the journal), but the crash is still
+counted and grouped by executable name. Crashes still visible to
+`coredumpctl` are not double-counted.
+
 ### Permissions
 
 - `coredumpctl` needs permission to read the coredump (root, or a user in
   a group with journal/coredump ACLs).
+- Under `sudo`, the default `-db` path resolves via `$SUDO_USER` to the
+  invoking user's home, so plain and sudo runs share one database.
 - `/var/crash/*.crash` files written by Apport are typically root-owned
   (mode 0600). Run the binary as root for full Apport coverage; without
   root it silently skips files it can't read.
