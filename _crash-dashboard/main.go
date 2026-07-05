@@ -893,6 +893,10 @@ pre { background: #16151f; border: 1px solid #2c2a40; border-radius: 6px; paddin
 .occ { margin-bottom: 18px; }
 .occ .head { color: #918cb0; font-size: 12px; margin-bottom: 6px; }
 .empty { color: #918cb0; padding: 40px; text-align: center; }
+.toolbar { text-align: right; margin-bottom: 10px; font-size: 13px; }
+th a { color: #918cb0; }
+tr.group td { background: #26243a; color: #e8e6ef; font-weight: 600; font-size: 13px; padding: 8px 12px; }
+tr.group:hover td { background: #26243a; }
 `
 
 type issueView struct {
@@ -902,8 +906,52 @@ type issueView struct {
 	Resolved                         bool
 }
 
+type issueGroup struct {
+	Executable string
+	Issues     []issueView
+}
+
 type indexData struct {
-	Issues []issueView
+	Issues    []issueView
+	Groups    []issueGroup
+	Grouped   bool
+	Sort, Dir string
+}
+
+// SortLink builds a column header URL: clicking the current sort column flips
+// the direction, clicking a different column selects it in its default order.
+func (d indexData) SortLink(col string) string {
+	dir := defaultSortDir(col)
+	if d.Sort == col {
+		if d.Dir == "asc" {
+			dir = "desc"
+		} else {
+			dir = "asc"
+		}
+	}
+	link := "/?sort=" + col + "&dir=" + dir
+	if d.Grouped {
+		link += "&group=process"
+	}
+	return link
+}
+
+func (d indexData) Arrow(col string) string {
+	if d.Sort != col {
+		return ""
+	}
+	if d.Dir == "asc" {
+		return " ▲"
+	}
+	return " ▼"
+}
+
+func (d indexData) GroupLink() string {
+	link := "/?sort=" + d.Sort + "&dir=" + d.Dir
+	if !d.Grouped {
+		link += "&group=process"
+	}
+	return link
 }
 
 type occurrenceView struct {
@@ -916,7 +964,13 @@ type issueDetail struct {
 	Occurrences []occurrenceView
 }
 
-var indexTmpl = template.Must(template.New("index").Parse(`<!doctype html>
+var indexTmpl = template.Must(template.New("index").Parse(`{{define "row"}}<tr>
+<td><a href="/issue/{{.ID}}">{{.TopFrame}}</a><div class="exe">{{.Executable}}</div></td>
+<td><span class="badge badge-sig">{{.Signal}}</span></td>
+<td><span class="badge badge-count">{{.Count}}</span></td>
+<td>{{.LastSeen}}</td>
+<td>{{if .Resolved}}<span class="badge badge-resolved">resolved</span>{{else}}open{{end}}</td>
+</tr>{{end}}<!doctype html>
 <html><head><meta charset="utf-8"><title>Crash Dashboard</title><style>` + pageCSS + `</style></head>
 <body>
 <header><h1>Crash Dashboard</h1><div class="sub">systemd-coredump + apport, grouped by executable / signal / top frame</div></header>
@@ -924,16 +978,26 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!doctype html>
 {{if not .Issues}}
 <div class="empty">No crashes recorded yet.</div>
 {{else}}
+<div class="toolbar"><a href="{{.GroupLink}}">{{if .Grouped}}Ungroup{{else}}Group by process{{end}}</a></div>
 <table>
-<tr><th>Issue</th><th>Signal</th><th>Events</th><th>Last seen</th><th>Status</th></tr>
-{{range .Issues}}
 <tr>
-<td><a href="/issue/{{.ID}}">{{.TopFrame}}</a><div class="exe">{{.Executable}}</div></td>
-<td><span class="badge badge-sig">{{.Signal}}</span></td>
-<td><span class="badge badge-count">{{.Count}}</span></td>
-<td>{{.LastSeen}}</td>
-<td>{{if .Resolved}}<span class="badge badge-resolved">resolved</span>{{else}}open{{end}}</td>
+<th><a href="{{.SortLink "issue"}}">Issue{{.Arrow "issue"}}</a></th>
+<th><a href="{{.SortLink "signal"}}">Signal{{.Arrow "signal"}}</a></th>
+<th><a href="{{.SortLink "events"}}">Events{{.Arrow "events"}}</a></th>
+<th><a href="{{.SortLink "lastseen"}}">Last seen{{.Arrow "lastseen"}}</a></th>
+<th><a href="{{.SortLink "status"}}">Status{{.Arrow "status"}}</a></th>
 </tr>
+{{if .Grouped}}
+{{range .Groups}}
+<tr class="group"><td colspan="5">{{.Executable}} <span class="exe">({{len .Issues}} issue{{if ne (len .Issues) 1}}s{{end}})</span></td></tr>
+{{range .Issues}}
+{{template "row" .}}
+{{end}}
+{{end}}
+{{else}}
+{{range .Issues}}
+{{template "row" .}}
+{{end}}
 {{end}}
 </table>
 {{end}}
@@ -993,6 +1057,59 @@ func humanTime(t time.Time) string {
 	}
 }
 
+// defaultSortDir picks the order a column starts in when first clicked:
+// newest/busiest first for time and count columns, alphabetical for text.
+func defaultSortDir(col string) string {
+	switch col {
+	case "issue", "signal", "status":
+		return "asc"
+	default:
+		return "desc"
+	}
+}
+
+var sortCols = map[string]bool{
+	"issue": true, "signal": true, "events": true, "lastseen": true, "status": true,
+}
+
+func sortIssues(issues []Issue, col, dir string) {
+	less := func(a, b Issue) bool { return a.LastSeen.Before(b.LastSeen) }
+	switch col {
+	case "issue":
+		less = func(a, b Issue) bool { return a.TopFrame < b.TopFrame }
+	case "signal":
+		less = func(a, b Issue) bool { return a.Signal < b.Signal }
+	case "events":
+		less = func(a, b Issue) bool { return a.Count < b.Count }
+	case "status":
+		// open sorts before resolved ascending
+		less = func(a, b Issue) bool { return !a.Resolved && b.Resolved }
+	}
+	sort.SliceStable(issues, func(i, j int) bool {
+		if dir == "desc" {
+			return less(issues[j], issues[i])
+		}
+		return less(issues[i], issues[j])
+	})
+}
+
+// groupByProcess splits sorted issues into per-executable groups, ordered by
+// each executable's first appearance so the group order follows the sort.
+func groupByProcess(views []issueView) []issueGroup {
+	var groups []issueGroup
+	index := make(map[string]int)
+	for _, v := range views {
+		i, ok := index[v.Executable]
+		if !ok {
+			i = len(groups)
+			index[v.Executable] = i
+			groups = append(groups, issueGroup{Executable: v.Executable})
+		}
+		groups[i].Issues = append(groups[i].Issues, v)
+	}
+	return groups
+}
+
 func newServer(store *Store) http.Handler {
 	mux := http.NewServeMux()
 
@@ -1002,11 +1119,25 @@ func newServer(store *Store) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		col := r.URL.Query().Get("sort")
+		if !sortCols[col] {
+			col = "lastseen"
+		}
+		dir := r.URL.Query().Get("dir")
+		if dir != "asc" && dir != "desc" {
+			dir = defaultSortDir(col)
+		}
+		sortIssues(issues, col, dir)
 		var views []issueView
 		for _, iss := range issues {
 			views = append(views, toIssueView(iss))
 		}
-		if err := indexTmpl.Execute(w, indexData{Issues: views}); err != nil {
+		data := indexData{Issues: views, Sort: col, Dir: dir}
+		if r.URL.Query().Get("group") == "process" {
+			data.Grouped = true
+			data.Groups = groupByProcess(views)
+		}
+		if err := indexTmpl.Execute(w, data); err != nil {
 			log.Printf("render index: %v", err)
 		}
 	})

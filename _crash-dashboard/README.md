@@ -4,7 +4,9 @@ A proof-of-concept, Sentry-style crash dashboard for a personal Linux
 machine. Single Go binary, no cgo. Polls `coredumpctl` (systemd-coredump),
 the `/var/lib/systemd/coredump` directory itself, and `/var/crash`
 (Apport) for new crashes, groups repeats into "issues" by
-executable + signal + top stack frame, and serves a small web UI. Also
+executable + signal + top stack frame, and serves a small web UI. The
+issue list can be sorted by any column (click a header) and grouped by
+process. Also
 speaks a minimal MCP so an AI assistant can query and resolve crashes
 directly.
 
