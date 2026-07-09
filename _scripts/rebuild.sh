@@ -23,6 +23,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
 TARGET="${1:-}"
@@ -44,19 +45,16 @@ fi
 
 # Hash of a package's patch series — part of the up-to-date stamp
 patches_hash() {
-    cat "$REPO_DIR/$1/series" "$REPO_DIR/$1"/*.patch 2>/dev/null | sha256sum | awk '{print $1}'
+    cat "$PATCHES_DIR/$1/series" "$PATCHES_DIR/$1"/*.patch 2>/dev/null | sha256sum | awk '{print $1}'
 }
 
 PACKAGES=()
 if [[ "$TARGET" == "--all" ]]; then
-    for d in "$REPO_DIR"/*/; do
-        name="$(basename "$d")"
-        [[ "$name" == _* ]] && continue
-        [[ "$name" == .* ]] && continue
-        PACKAGES+=("$name")
+    for d in "$PATCHES_DIR"/*/; do
+        PACKAGES+=("$(basename "$d")")
     done
 else
-    if [[ ! -d "$REPO_DIR/$TARGET" ]]; then
+    if [[ ! -d "$PATCHES_DIR/$TARGET" ]]; then
         echo "Error: no patches directory found for '$TARGET'"
         exit 1
     fi
@@ -112,10 +110,10 @@ rebuild_one() {
     # Drop any quilt state dpkg-source left for debian/patches + our symlink
     rm -rf "$SOURCE_DIR/.pc"
     rm -f "$SOURCE_DIR/patches"
-    ln -s "$REPO_DIR/$PACKAGE" "$SOURCE_DIR/patches"
+    ln -s "$PATCHES_DIR/$PACKAGE" "$SOURCE_DIR/patches"
 
     # Apply patch by patch, refreshing any that land with offsets/fuzz
-    local SERIES="$REPO_DIR/$PACKAGE/series"
+    local SERIES="$PATCHES_DIR/$PACKAGE/series"
     local PATCH OUT REFRESHED=""
     while IFS= read -r PATCH || [[ -n "$PATCH" ]]; do
         [[ "$PATCH" =~ ^#.*$ || -z "$PATCH" ]] && continue
@@ -136,10 +134,10 @@ rebuild_one() {
 
     # Re-bless verified version
     local VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
-    echo "$VERSION" > "$REPO_DIR/$PACKAGE/VERIFIED"
+    echo "$VERSION" > "$PATCHES_DIR/$PACKAGE/VERIFIED"
     echo "==> Verified against $VERSION"
     if [[ -n "$REFRESHED" ]]; then
-        echo "==> Refreshed:$REFRESHED — review and commit the changes in $REPO_DIR/$PACKAGE/"
+        echo "==> Refreshed:$REFRESHED — review and commit the changes in $PATCHES_DIR/$PACKAGE/"
     fi
 
     # Build (and install unless --no-install)

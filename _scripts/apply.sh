@@ -7,7 +7,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PATCHES_DIR="$REPO_DIR"
+PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${2:-$HOME/src}"
 
 PACKAGE="${1:-}"
@@ -15,10 +15,8 @@ if [[ -z "$PACKAGE" ]]; then
     echo "Usage: $0 <package-name> [work-dir]"
     echo ""
     echo "Available packages:"
-    for d in "$REPO_DIR"/*/; do
+    for d in "$PATCHES_DIR"/*/; do
         name="$(basename "$d")"
-        [[ "$name" == _* ]] && continue
-        [[ "$name" == .* ]] && continue
         echo "  $name"
     done
     exit 1

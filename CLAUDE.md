@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Target platform: **elementary OS 8** (Ubuntu 24.04 base). Source packages are pulled from that archive via `apt source`, so any version assumptions (build-deps, library APIs, etc.) should be checked against noble, not jammy.
 
-Personal quilt-style patch series for elementary OS Debian source packages. Each top-level directory named after a package (e.g. `io.elementary.notifications/`) holds a `series` file plus numbered `.patch` files in standard quilt format. Patches are AI-assisted and intentionally kept out of upstream — they live here for local rebuilds.
+Personal quilt-style patch series for elementary OS Debian source packages. Each directory under `pkgs/` named after a package (e.g. `pkgs/io.elementary.notifications/`) holds a `series` file plus numbered `.patch` files in standard quilt format. Patches are AI-assisted and intentionally kept out of upstream — they live here for local rebuilds.
 
 Underscore-prefixed directories are tooling, not patch series: `_scripts/` holds the `ep` helper scripts, and `_crash-dashboard/` is a standalone Go binary (Sentry-style local crash dashboard over coredumpctl/Apport, with a web UI and an `-mcp` stdio mode for assistant-driven triage — see its README). Build with `go build` inside that directory; don't add a `series` file there.
 
@@ -25,7 +25,7 @@ The intended workflow (per `README.md`) is driven by an `ep` CLI wrapper:
 ./ep status  [package]              # quilt applied/unapplied
 ```
 
-Source is fetched into `$WORK_DIR` (default `~/src`) via `apt source`. Patches are exposed to quilt by symlinking `<repo>/<package>` into `<source>/patches`, with `.pc` state kept inside the source tree.
+Source is fetched into `$WORK_DIR` (default `~/src`) via `apt source`. Patches are exposed to quilt by symlinking `<repo>/pkgs/<package>` into `<source>/patches`, with `.pc` state kept inside the source tree.
 
 ## Script invariants
 

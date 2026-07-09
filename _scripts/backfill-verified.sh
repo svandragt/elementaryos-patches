@@ -13,17 +13,15 @@
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
 if [[ $# -gt 0 ]]; then
     PACKAGES=("$@")
 else
     PACKAGES=()
-    for d in "$REPO_DIR"/*/; do
-        name="$(basename "$d")"
-        [[ "$name" == _* ]] && continue
-        [[ "$name" == .* ]] && continue
-        PACKAGES+=("$name")
+    for d in "$PATCHES_DIR"/*/; do
+        PACKAGES+=("$(basename "$d")")
     done
 fi
 
@@ -55,7 +53,7 @@ for PACKAGE in "${PACKAGES[@]}"; do
     fi
 
     VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
-    echo "$VERSION" > "$REPO_DIR/$PACKAGE/VERIFIED"
+    echo "$VERSION" > "$PATCHES_DIR/$PACKAGE/VERIFIED"
     echo "==> Wrote $PACKAGE/VERIFIED: $VERSION"
     OK+=("$PACKAGE")
 done

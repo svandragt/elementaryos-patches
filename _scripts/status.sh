@@ -5,11 +5,12 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PKGS_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
 show_package() {
     local PACKAGE="$1"
-    local PATCHES_DIR="$REPO_DIR/$PACKAGE"
+    local PATCHES_DIR="$PKGS_DIR/$PACKAGE"
     local SERIES="$PATCHES_DIR/series"
 
     echo "=== $PACKAGE ==="
@@ -42,10 +43,8 @@ show_package() {
 
 FILTER="${1:-}"
 
-for d in "$REPO_DIR"/*/; do
+for d in "$PKGS_DIR"/*/; do
     name="$(basename "$d")"
-    [[ "$name" == _* ]] && continue
-    [[ "$name" == .* ]] && continue
     if [[ -n "$FILTER" && "$name" != "$FILTER" ]]; then
         continue
     fi

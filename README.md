@@ -11,11 +11,11 @@ bother me enough to maintain them locally.
 
 | Package | Patches | Description |
 |---------|---------|-------------|
-| [io.elementary.notifications](io.elementary.notifications/) | [series](io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11; fix notifications silently dropped after sleep/resume (GDK frame clock not ready, retry until compositor is up) |
-| [gala](gala/) | [series](gala/series) | Stop crash loop from unbalanced `WorkspaceManager.thaw_remove` when a workspace is added outside a swipe gesture; prevent focus-stealing on attention demand |
-| [io.elementary.terminal](io.elementary.terminal/) | [series](io.elementary.terminal/series) | Restore double-click on empty tab bar to open a new tab (GTK4 regression); open OSC 8 hyperlinks on ctrl-click |
-| [pantheon-files](pantheon-files/) | [series](pantheon-files/series) | Double-click on empty tab bar opens a new tab (matches terminal behavior) |
-| [appcenter](appcenter/) | [series](appcenter/series) | Don't show AppCenter in the dock with a "0" badge when there are no pending updates |
+| [io.elementary.notifications](pkgs/io.elementary.notifications/) | [series](pkgs/io.elementary.notifications/series) | Don't steal focus when a notification bubble appears on X11; fix notifications silently dropped after sleep/resume (GDK frame clock not ready, retry until compositor is up) |
+| [gala](pkgs/gala/) | [series](pkgs/gala/series) | Stop crash loop from unbalanced `WorkspaceManager.thaw_remove` when a workspace is added outside a swipe gesture; prevent focus-stealing on attention demand |
+| [io.elementary.terminal](pkgs/io.elementary.terminal/) | [series](pkgs/io.elementary.terminal/series) | Restore double-click on empty tab bar to open a new tab (GTK4 regression); open OSC 8 hyperlinks on ctrl-click |
+| [pantheon-files](pkgs/pantheon-files/) | [series](pkgs/pantheon-files/series) | Double-click on empty tab bar opens a new tab (matches terminal behavior) |
+| [appcenter](pkgs/appcenter/) | [series](pkgs/appcenter/series) | Don't show AppCenter in the dock with a "0" badge when there are no pending updates |
 
 Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
@@ -25,8 +25,8 @@ Target: elementary OS 8 (Ubuntu 24.04 / noble).
 |------|-------------|
 | [_crash-dashboard](_crash-dashboard/) | Sentry-style POC crash dashboard: single Go binary that collects crashes from `coredumpctl` and Apport, groups them into issues with stack traces, and serves a localhost web UI. Also runs as a minimal MCP server (`-mcp`) so an AI assistant can list, inspect, and resolve reported crashes. See its [README](_crash-dashboard/README.md). |
 
-Underscore-prefixed directories (`_scripts/`, `_crash-dashboard/`) are
-tooling, not patch series — `ep` skips them.
+Patch series live under `pkgs/`; underscore-prefixed directories
+(`_scripts/`, `_crash-dashboard/`) are tooling, not patch series.
 
 ## Install a patched package (end users)
 
@@ -127,7 +127,7 @@ manual rebase:
 ```bash
 ./ep refresh io.elementary.notifications --rebase
 # Fix any failures (quilt will stop and tell you)
-git add io.elementary.notifications/
+git add pkgs/io.elementary.notifications/
 git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 ```
 

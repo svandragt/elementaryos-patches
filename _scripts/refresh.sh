@@ -9,6 +9,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
 PACKAGE="${1:-}"
@@ -44,11 +45,11 @@ if [[ "$MODE" == "--rebase" ]]; then
         echo "==> New source: $NEW_SOURCE_DIR"
         SOURCE_DIR="$NEW_SOURCE_DIR"
         rm -f "$SOURCE_DIR/patches"
-        ln -s "$REPO_DIR/$PACKAGE" "$SOURCE_DIR/patches"
+        ln -s "$PATCHES_DIR/$PACKAGE" "$SOURCE_DIR/patches"
     fi
 
     echo "==> Re-applying patches one by one..."
-    SERIES="$REPO_DIR/$PACKAGE/series"
+    SERIES="$PATCHES_DIR/$PACKAGE/series"
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip comments and blank lines
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
@@ -72,10 +73,10 @@ else
     # Simple refresh of top patch
     echo "==> Refreshing top patch..."
     (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" refresh)
-    echo "==> Done. Patch updated in $REPO_DIR/$PACKAGE/"
+    echo "==> Done. Patch updated in $PATCHES_DIR/$PACKAGE/"
 fi
 
 # Record verified-against version
 VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
-echo "$VERSION" > "$REPO_DIR/$PACKAGE/VERIFIED"
+echo "$VERSION" > "$PATCHES_DIR/$PACKAGE/VERIFIED"
 echo "==> Recorded verified version: $VERSION"

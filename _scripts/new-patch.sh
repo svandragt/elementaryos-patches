@@ -25,7 +25,7 @@ if [[ -z "$SOURCE_DIR" ]]; then
 fi
 
 # Generate a sequential patch name
-PATCHES_DIR="$REPO_DIR/$PACKAGE"
+PATCHES_DIR="$REPO_DIR/pkgs/$PACKAGE"
 SERIES_FILE="$PATCHES_DIR/series"
 
 # Count existing patches to get next number
