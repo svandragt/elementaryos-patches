@@ -23,10 +23,10 @@ Target: elementary OS 8 (Ubuntu 24.04 / noble).
 
 | Tool | Description |
 |------|-------------|
-| [_crash-dashboard](_crash-dashboard/) | Sentry-style POC crash dashboard: single Go binary that collects crashes from `coredumpctl` and Apport, groups them into issues with stack traces, and serves a localhost web UI. Also runs as a minimal MCP server (`-mcp`) so an AI assistant can list, inspect, and resolve reported crashes. See its [README](_crash-dashboard/README.md). |
+| [crash-dashboard](crash-dashboard/) | Sentry-style POC crash dashboard: single Go binary that collects crashes from `coredumpctl` and Apport, groups them into issues with stack traces, and serves a localhost web UI. Also runs as a minimal MCP server (`-mcp`) so an AI assistant can list, inspect, and resolve reported crashes. See its [README](crash-dashboard/README.md). |
 
-Patch series live under `pkgs/`; underscore-prefixed directories
-(`_scripts/`, `_crash-dashboard/`) are tooling, not patch series.
+Patch series live under `pkgs/`; `scripts/` and `crash-dashboard/` are
+tooling, not patch series.
 
 ## Install a patched package (end users)
 
@@ -52,7 +52,7 @@ sudo apt update
 ```bash
 git clone https://github.com/svandragt/elementary-patches.git
 cd elementary-patches
-chmod +x ep _scripts/*.sh
+chmod +x ep scripts/*.sh
 cat quiltrc >> ~/.quiltrc        # one time
 
 ./ep apply io.elementary.notifications       # fetch source + apply patches
@@ -97,7 +97,7 @@ ep status  [package]              Show patch status
 ./ep new     <package> "fix crash on startup" # create the patch
 ./ep edit    <package> path/to/file.vala     # add file to patch and open in $EDITOR
 ./ep refresh <package>                        # finalise the patch
-git add <package>/
+git add pkgs/<package>/
 git commit -m "<package>: fix crash on startup"
 ```
 
@@ -145,7 +145,7 @@ from the recorded one so you know to eyeball the result. `ep refresh` rewrites
 
 To record `VERIFIED` for every package whose patches already apply cleanly
 against the current archive, run the one-shot
-`./_scripts/backfill-verified.sh` (optionally pass package names to limit it).
+`./scripts/backfill-verified.sh` (optionally pass package names to limit it).
 
 ### Environment variables
 
@@ -166,6 +166,6 @@ Permission is hereby granted to integrate the patches upstream.
 This repo is **GPL-3.0** — same as the upstream packages it patches
 (io.elementary.notifications is GPL-3.0). Patch files are derivative works of
 the upstream source they apply to and inherit that licence; the wrapper
-tooling (`ep`, `_scripts/`) is licensed under GPL-3.0 too for simplicity.
+tooling (`ep`, `scripts/`) is licensed under GPL-3.0 too for simplicity.
 
 See [LICENSE](LICENSE) for the full text.

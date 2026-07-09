@@ -142,12 +142,12 @@ rebuild_one() {
 
     # Build (and install unless --no-install)
     if [[ -n "$INSTALL" ]]; then
-        bash "$REPO_DIR/_scripts/build.sh" "$PACKAGE" --install || return 2
+        bash "$REPO_DIR/scripts/build.sh" "$PACKAGE" --install || return 2
         # Stamp so the next run skips this version+series (hash recomputed:
         # the apply step may have auto-refreshed patches)
         echo "$VERSION $(patches_hash "$PACKAGE")" > "$STAMP"
     else
-        bash "$REPO_DIR/_scripts/build.sh" "$PACKAGE" || return 2
+        bash "$REPO_DIR/scripts/build.sh" "$PACKAGE" || return 2
     fi
     return 0
 }

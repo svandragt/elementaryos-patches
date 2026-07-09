@@ -61,7 +61,7 @@ if [[ "$MODE" == "--rebase" ]]; then
             echo "!!! Patch failed: $PATCH"
             echo "    Fix the .rej files in $SOURCE_DIR, then run:"
             echo "    QUILT_PC=$SOURCE_DIR/.pc QUILT_PATCHES=$SOURCE_DIR/patches quilt --quiltrc $REPO_DIR/quiltrc refresh"
-            echo "    Then re-run: ./_scripts/refresh.sh $PACKAGE --rebase"
+            echo "    Then re-run: ./scripts/refresh.sh $PACKAGE --rebase"
             exit 1
         fi
     done < "$SERIES"

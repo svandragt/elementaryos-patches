@@ -4,7 +4,7 @@
 # Usage: ep <command> [args...]
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS="$REPO_DIR/_scripts"
+SCRIPTS="$REPO_DIR/scripts"
 
 CMD="${1:-help}"
 shift || true

@@ -20,7 +20,7 @@ fi
 SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" 2>/dev/null | sort -V | tail -1)
 if [[ -z "$SOURCE_DIR" ]]; then
     echo "Error: no source directory found for '$PACKAGE' in $WORK_DIR"
-    echo "Run: ./_scripts/apply.sh $PACKAGE"
+    echo "Run: ./scripts/apply.sh $PACKAGE"
     exit 1
 fi
 
@@ -47,4 +47,4 @@ echo "    (edit the file)"
 echo "    QUILT_PATCHES=patches quilt refresh"
 echo "    QUILT_PATCHES=patches quilt header -e   # optional: add a description"
 echo ""
-echo "Or run: ./_scripts/edit.sh $PACKAGE <file-to-edit>"
+echo "Or run: ./scripts/edit.sh $PACKAGE <file-to-edit>"

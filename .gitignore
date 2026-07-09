@@ -1,4 +1,4 @@
 .claude/
 .serena/
-_crash-dashboard/crash-dashboard
-_crash-dashboard/*.db
+crash-dashboard/crash-dashboard
+crash-dashboard/*.db

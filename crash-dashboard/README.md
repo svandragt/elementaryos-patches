@@ -16,7 +16,7 @@ beyond localhost.
 ## Build
 
 ```bash
-cd _crash-dashboard
+cd crash-dashboard
 go build -o crash-dashboard .
 ```
 
@@ -127,7 +127,5 @@ verified — without touching the web UI.
 
 ## Why this isn't wired into `ep`
 
-This isn't a quilt patch series, so it's prefixed with `_` (like
-`_scripts/`) to stay out of `ep apply` / `ep status` package discovery,
-which loops over non-underscore top-level directories expecting a
-`series` file.
+This isn't a quilt patch series, so it lives outside `pkgs/` — `ep apply`
+and `ep status` only loop over directories under `pkgs/`.

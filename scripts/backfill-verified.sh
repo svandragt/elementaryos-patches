@@ -2,7 +2,7 @@
 # backfill-verified.sh — one-shot: record VERIFIED for every package whose
 # patches currently apply cleanly against the source apt ships today.
 #
-# Usage: ./_scripts/backfill-verified.sh [package ...]
+# Usage: ./scripts/backfill-verified.sh [package ...]
 #   With no args: processes every package directory in the repo.
 #   With args:    processes only the listed packages.
 #
@@ -39,7 +39,7 @@ for PACKAGE in "${PACKAGES[@]}"; do
     echo "==> Removing any existing source dirs for $PACKAGE..."
     find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" -exec rm -rf {} +
 
-    if ! bash "$REPO_DIR/_scripts/apply.sh" "$PACKAGE"; then
+    if ! bash "$REPO_DIR/scripts/apply.sh" "$PACKAGE"; then
         echo "!!! apply failed for $PACKAGE — skipping"
         FAIL+=("$PACKAGE")
         continue

@@ -28,4 +28,4 @@ fi
 
 echo ""
 echo "==> When done editing, run:"
-echo "    ./_scripts/refresh.sh $PACKAGE"
+echo "    ./scripts/refresh.sh $PACKAGE"

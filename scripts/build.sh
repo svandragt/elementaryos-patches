@@ -18,7 +18,7 @@ fi
 SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" 2>/dev/null | sort -V | tail -1)
 if [[ -z "$SOURCE_DIR" ]]; then
     echo "Error: source directory not found for $PACKAGE in $WORK_DIR"
-    echo "Run: ./_scripts/apply.sh $PACKAGE"
+    echo "Run: ./scripts/apply.sh $PACKAGE"
     exit 1
 fi
 
