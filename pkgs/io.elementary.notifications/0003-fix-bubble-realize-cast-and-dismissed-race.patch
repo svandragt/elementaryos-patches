@@ -8,19 +8,20 @@
  
      private double current_swipe_progress = 1.0;
      private Pantheon.Desktop.Shell? desktop_shell;
-@@ -115,9 +116,12 @@
+@@ -114,10 +115,13 @@
+ 
          accessible_role = ALERT;
  
-         child.realize.connect (() => {
+-        child.realize.connect (() => {
 -            // scroll_to before realization is a no-op (no widget size yet); do it
 -            // here so the carousel is at the overlay page before the window maps
--            carousel.scroll_to (overlay, false);
-+            // scroll_to right on realize is a no-op (no allocation yet); defer to
-+            // idle so the carousel has a real size and it actually lands on the
-+            // overlay page before the window maps
-+            Idle.add_once (() => {
-+                carousel.scroll_to (overlay, false);
-+            });
++        // scroll_to needs a real allocation to land; realize alone doesn't
++        // guarantee one, but map does, since GTK lays out before mapping.
++        child.map.connect (() => {
+             carousel.scroll_to (overlay, false);
++        });
++
++        child.realize.connect (() => {
              if (Gdk.Display.get_default () is Gdk.Wayland.Display) {
                  //  We have to wrap in Idle otherwise the Meta.Window of the WaylandSurface in Gala is still null
                  Idle.add_once (init_wl);
