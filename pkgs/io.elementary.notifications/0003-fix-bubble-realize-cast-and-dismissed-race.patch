@@ -4,31 +4,50 @@
  
      private uint timeout_id;
      private uint realize_retry_count = 0;
-+    private bool scrolled_to_overlay = false;
++    private bool settled_on_overlay = false;
  
      private double current_swipe_progress = 1.0;
      private Pantheon.Desktop.Shell? desktop_shell;
-@@ -118,6 +119,7 @@
-             // scroll_to before realization is a no-op (no widget size yet); do it
-             // here so the carousel is at the overlay page before the window maps
-             carousel.scroll_to (overlay, false);
-+            scrolled_to_overlay = true;
+@@ -115,9 +116,12 @@
+         accessible_role = ALERT;
+ 
+         child.realize.connect (() => {
+-            // scroll_to before realization is a no-op (no widget size yet); do it
+-            // here so the carousel is at the overlay page before the window maps
+-            carousel.scroll_to (overlay, false);
++            // scroll_to right on realize is a no-op (no allocation yet); defer to
++            // idle so the carousel has a real size and it actually lands on the
++            // overlay page before the window maps
++            Idle.add_once (() => {
++                carousel.scroll_to (overlay, false);
++            });
              if (Gdk.Display.get_default () is Gdk.Wayland.Display) {
                  //  We have to wrap in Idle otherwise the Meta.Window of the WaylandSurface in Gala is still null
                  Idle.add_once (init_wl);
-@@ -142,7 +144,10 @@
-     }
- 
-     private void on_page_changed (Adw.Carousel carousel, uint index) {
--        if (!get_mapped ()) {
-+        // Before the initial scroll_to (on realize) has landed, a page-changed event
-+        // reflects setup, not a user swipe — ignore it or a slow first paint (e.g. when
-+        // sound playback delays the event loop less than usual) reads as a dismissal.
-+        if (!get_mapped () || !scrolled_to_overlay) {
+@@ -146,9 +150,20 @@
              return;
          }
  
-@@ -175,13 +180,13 @@
+-        if (carousel.get_nth_page (index) != overlay) {
+-            closed (CloseReason.DISMISSED);
++        if (carousel.get_nth_page (index) == overlay) {
++            // The initial scroll_to (on realize) doesn't land synchronously — the
++            // carousel can report being on the placeholder page once first, before
++            // settling on the overlay. Only trust a page mismatch as a real user
++            // swipe-to-dismiss once we've seen it actually reach the overlay page.
++            settled_on_overlay = true;
++            return;
+         }
++
++        if (!settled_on_overlay) {
++            return;
++        }
++
++        closed (CloseReason.DISMISSED);
+     }
+ 
+     private void update_swipe_progress (Object obj, ParamSpec pspec) {
+@@ -175,13 +190,13 @@
          if (Gdk.Display.get_default () is Gdk.X11.Display) {
              // Avoid present on X11 because it focuses the window.
              // Realize first so we can set the window type atom before the WM sees it.
