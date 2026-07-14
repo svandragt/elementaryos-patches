@@ -28,3 +28,19 @@
              return;
          }
  
+@@ -175,13 +180,13 @@
+         if (Gdk.Display.get_default () is Gdk.X11.Display) {
+             // Avoid present on X11 because it focuses the window.
+             // Realize first so we can set the window type atom before the WM sees it.
+-            realize ();
++            ((Gtk.Widget) this).realize ();
+             // After sleep/resume the compositor may not have a frame clock ready yet,
+             // causing realize() to silently produce a surface with no frame clock.
+             // Detect this and retry until the compositor is ready (up to ~4 s).
+             var native_surface = ((Gtk.Native) this).get_surface ();
+             if (native_surface == null || native_surface.get_frame_clock () == null) {
+-                unrealize ();
++                ((Gtk.Widget) this).unrealize ();
+                 if (realize_retry_count < 20) {
+                     realize_retry_count++;
+                     Timeout.add (200, () => {
