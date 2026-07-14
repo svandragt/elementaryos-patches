@@ -1,0 +1,30 @@
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/AbstractBubble.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/AbstractBubble.vala
+@@ -45,6 +45,7 @@
+ 
+     private uint timeout_id;
+     private uint realize_retry_count = 0;
++    private bool scrolled_to_overlay = false;
+ 
+     private double current_swipe_progress = 1.0;
+     private Pantheon.Desktop.Shell? desktop_shell;
+@@ -118,6 +119,7 @@
+             // scroll_to before realization is a no-op (no widget size yet); do it
+             // here so the carousel is at the overlay page before the window maps
+             carousel.scroll_to (overlay, false);
++            scrolled_to_overlay = true;
+             if (Gdk.Display.get_default () is Gdk.Wayland.Display) {
+                 //  We have to wrap in Idle otherwise the Meta.Window of the WaylandSurface in Gala is still null
+                 Idle.add_once (init_wl);
+@@ -142,7 +144,10 @@
+     }
+ 
+     private void on_page_changed (Adw.Carousel carousel, uint index) {
+-        if (!get_mapped ()) {
++        // Before the initial scroll_to (on realize) has landed, a page-changed event
++        // reflects setup, not a user swipe — ignore it or a slow first paint (e.g. when
++        // sound playback delays the event loop less than usual) reads as a dismissal.
++        if (!get_mapped () || !scrolled_to_overlay) {
+             return;
+         }
+ 
