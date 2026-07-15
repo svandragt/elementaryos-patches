@@ -11,17 +11,16 @@
              base.show ();
          } else {
              base.present ();
-@@ -279,6 +283,13 @@
+@@ -279,6 +283,12 @@
              // 32 is format
              // 0 means replace
              xdisplay.change_property (window, atom, (X.Atom) 4, 32, 0, (uchar[]) notification_atom, 1);
 +
-+            // _NET_WM_USER_TIME = 0 tells the WM this window was not opened by
-+            // user interaction, so it must not receive focus when mapped.
-+            var user_time_atom = xdisplay.intern_atom ("_NET_WM_USER_TIME", false);
-+            uint32 user_time = 0;
-+            // (X.Atom) 6 is XA_CARDINAL
-+            xdisplay.change_property (window, user_time_atom, (X.Atom) 6, 32, 0, (uchar[]) user_time, 1);
++            // User time 0 tells the WM this window was not opened by user
++            // interaction, so it must not receive focus when mapped. Must go
++            // through GDK: it registers a dedicated _NET_WM_USER_TIME_WINDOW,
++            // so the WM ignores the property on the toplevel itself.
++            x11_surface.set_user_time (0);
          }
      }
  
