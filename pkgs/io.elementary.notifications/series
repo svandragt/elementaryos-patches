@@ -1,3 +1,4 @@
 0001-fix-focus-on-x11.patch
 0002-fix-carousel-dismissed-on-resume.patch
 0003-fix-bubble-realize-cast-and-dismissed-race.patch
+0004-fix-focus-set-hints-before-map.patch
