@@ -1,2 +1,3 @@
 fix-workspace-thaw-unbalanced.patch
 fix-attention-focus-stealing.patch
+fix-notification-focus-steal-x11.patch

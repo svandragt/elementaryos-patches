@@ -1,0 +1,21 @@
+--- gala-8.5.1+r3055+pkg132~ubuntu8.1.orig/src/WindowManager.vala
++++ gala-8.5.1+r3055+pkg132~ubuntu8.1/src/WindowManager.vala
+@@ -709,6 +709,18 @@
+         private void on_focus_window_changed () {
+             unowned var display = get_display ();
+ 
++            // On X11 mutter's focus-on-map decision races the notification daemon's
++            // user-time hint, so bubbles can grab keyboard focus when mapped.
++            // Bounce focus back to the most recently used normal window.
++            if (display.focus_window != null && NotificationStack.is_notification (display.focus_window)) {
++                unowned var workspace = display.get_workspace_manager ().get_active_workspace ();
++                var mru = display.get_tab_list (NORMAL, workspace);
++                if (mru != null) {
++                    mru.data.focus (display.get_current_time_roundtrip ());
++                }
++                return;
++            }
++
+             if (!is_modal () || modal_stack.peek_head ().grab != null || display.focus_window == null ||
+                 ShellClientsManager.get_instance ().is_shell_window (display.focus_window)
+             ) {
