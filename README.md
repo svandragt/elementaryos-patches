@@ -79,7 +79,7 @@ The end-user steps above already get you a working dev environment. From there:
 
 ```
 ep apply   <package>              Fetch source and apply all patches
-ep new     <package> <desc>       Create a new patch
+ep new     <package> <desc>       Create a new patch (--local for an untracked patch)
 ep edit    <package> <file>       Add a file to current patch and open editor
 ep refresh <package>              Refresh top patch after editing
 ep refresh <package> --rebase     Rebase all patches onto new upstream version
@@ -133,6 +133,17 @@ git commit -m "io.elementary.notifications: rebase patches onto 8.x"
 
 After a `rebuild` that refreshed patches, review and commit the changed
 `.patch` files the same way.
+
+### Local, untracked patches
+
+`ep new <package> <desc> --local` creates the patch under `pkgs/<package>/local/`
+instead of `pkgs/<package>/`. That directory is gitignored — for patches you
+want built and installed locally but never committed (work in progress,
+or changes too speculative/personal for the tracked series). `ep apply`,
+`ep rebuild`, and `ep refresh --rebase` all apply the tracked series first,
+then `local/` on top, so local patches build on the committed ones.
+`ep edit`/`ep refresh` right after `ep new --local` write back to `local/`
+automatically. `ep status` lists local patches separately when present.
 
 ### Verified-against version
 

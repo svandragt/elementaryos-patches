@@ -2,3 +2,4 @@
 .serena/
 crash-dashboard/crash-dashboard
 crash-dashboard/*.db
+pkgs/*/local/

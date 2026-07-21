@@ -38,6 +38,17 @@ show_package() {
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
         echo "    - $line"
     done < "$SERIES"
+
+    local LOCAL_SERIES="$PATCHES_DIR/local/series"
+    if [[ -f "$LOCAL_SERIES" ]]; then
+        local LOCAL_COUNT
+        LOCAL_COUNT=$(grep -c '\.patch$' "$LOCAL_SERIES" 2>/dev/null || echo 0)
+        echo "  Local patches (untracked): $LOCAL_COUNT"
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+            echo "    - $line"
+        done < "$LOCAL_SERIES"
+    fi
     echo ""
 }
 

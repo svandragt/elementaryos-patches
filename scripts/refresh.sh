@@ -12,6 +12,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
+source "$REPO_DIR/scripts/lib.sh"
+
 PACKAGE="${1:-}"
 MODE="${2:-}"
 
@@ -26,15 +28,15 @@ if [[ -z "$SOURCE_DIR" ]]; then
     exit 1
 fi
 
-Q="QUILT_PC=$SOURCE_DIR/.pc QUILT_PATCHES=$SOURCE_DIR/patches quilt --quiltrc $REPO_DIR/quiltrc"
+TRACKED_DIR="$PATCHES_DIR/$PACKAGE"
+LOCAL_DIR="$TRACKED_DIR/local"
 
 if [[ "$MODE" == "--rebase" ]]; then
     echo "==> Popping all patches..."
-    (cd "$SOURCE_DIR" && eval "$Q pop -a") || true
+    (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" pop -a) || true
 
     echo "==> Fetching new upstream source..."
     cd "$WORK_DIR"
-    # Remove old source dir after backing up .pc state
     OLD_VERSION=$(basename "$SOURCE_DIR")
     apt source "$PACKAGE"
     NEW_SOURCE_DIR=$(find "$WORK_DIR" -maxdepth 1 -type d -name "${PACKAGE}-*" | sort -V | tail -1)
@@ -44,14 +46,13 @@ if [[ "$MODE" == "--rebase" ]]; then
     else
         echo "==> New source: $NEW_SOURCE_DIR"
         SOURCE_DIR="$NEW_SOURCE_DIR"
-        rm -f "$SOURCE_DIR/patches"
-        ln -s "$PATCHES_DIR/$PACKAGE" "$SOURCE_DIR/patches"
     fi
 
+    # Merged series (tracked + local/, if present) as one consistent quilt view
+    sync_patches_dir "$SOURCE_DIR" "$TRACKED_DIR" "$LOCAL_DIR"
+
     echo "==> Re-applying patches one by one..."
-    SERIES="$PATCHES_DIR/$PACKAGE/series"
     while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip comments and blank lines
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
         PATCH="$line"
         echo ""
@@ -64,19 +65,24 @@ if [[ "$MODE" == "--rebase" ]]; then
             echo "    Then re-run: ./scripts/refresh.sh $PACKAGE --rebase"
             exit 1
         fi
-    done < "$SERIES"
+    done < "$SOURCE_DIR/patches/series"
 
     echo ""
-    echo "==> All patches rebased successfully onto $(basename $SOURCE_DIR)"
+    echo "==> All patches rebased successfully onto $(basename "$SOURCE_DIR")"
 
 else
-    # Simple refresh of top patch
+    # Simple refresh of top patch. quilt writes the refreshed diff through
+    # the top patch's symlink in place, so it lands back in whichever real
+    # directory (tracked or local/) it came from.
     echo "==> Refreshing top patch..."
     (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" refresh)
-    echo "==> Done. Patch updated in $PATCHES_DIR/$PACKAGE/"
+    echo "==> Done."
 fi
 
-# Record verified-against version
+# Record verified-against version. Stamped in both the tracked dir and
+# local/ (if present) — cheap bookkeeping, no need to work out which one the
+# just-refreshed patch actually belongs to.
 VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
-echo "$VERSION" > "$PATCHES_DIR/$PACKAGE/VERIFIED"
+echo "$VERSION" > "$TRACKED_DIR/VERIFIED"
+[[ -f "$LOCAL_DIR/series" ]] && echo "$VERSION" > "$LOCAL_DIR/VERIFIED"
 echo "==> Recorded verified version: $VERSION"

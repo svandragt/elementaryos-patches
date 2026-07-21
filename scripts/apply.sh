@@ -10,6 +10,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${2:-$HOME/src}"
 
+source "$REPO_DIR/scripts/lib.sh"
+
 PACKAGE="${1:-}"
 if [[ -z "$PACKAGE" ]]; then
     echo "Usage: $0 <package-name> [work-dir]"
@@ -68,15 +70,18 @@ else
     echo "==> No VERIFIED file yet for $PACKAGE (run 'ep refresh' to record $CURRENT_VERSION)"
 fi
 
-# Remove any existing .pc state and patches symlink
+# Remove any existing .pc state and patches dir/symlink
 rm -rf "$SOURCE_DIR/.pc"
-rm -f "$SOURCE_DIR/patches"
+rm -rf "$SOURCE_DIR/patches"
 
-# Symlink our patches in
-ln -s "$PATCHES_DIR/$PACKAGE" "$SOURCE_DIR/patches"
-echo "==> Linked patches: $PATCHES_DIR/$PACKAGE -> $SOURCE_DIR/patches"
-
-# Apply
+# Build a merged patches dir (tracked series + pkgs/<package>/local/ on top,
+# if present) and push it in one go
+sync_patches_dir "$SOURCE_DIR" "$PATCHES_DIR/$PACKAGE" "$PATCHES_DIR/$PACKAGE/local"
+if [[ -f "$PATCHES_DIR/$PACKAGE/local/series" ]]; then
+    echo "==> Merged patches: $PATCHES_DIR/$PACKAGE + local/ -> $SOURCE_DIR/patches"
+else
+    echo "==> Linked patches: $PATCHES_DIR/$PACKAGE -> $SOURCE_DIR/patches"
+fi
 echo "==> Applying patches..."
 (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" push -a)
 

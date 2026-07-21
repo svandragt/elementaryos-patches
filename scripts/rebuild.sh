@@ -26,6 +26,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCHES_DIR="$REPO_DIR/pkgs"
 WORK_DIR="${WORK_DIR:-$HOME/src}"
 
+source "$REPO_DIR/scripts/lib.sh"
+
 TARGET="${1:-}"
 shift || true
 INSTALL="yes"
@@ -43,9 +45,12 @@ if [[ -z "$TARGET" ]]; then
     exit 1
 fi
 
-# Hash of a package's patch series — part of the up-to-date stamp
+# Hash of a package's patch series (tracked + local, if any) — part of the
+# up-to-date stamp
 patches_hash() {
-    cat "$PATCHES_DIR/$1/series" "$PATCHES_DIR/$1"/*.patch 2>/dev/null | sha256sum | awk '{print $1}'
+    cat "$PATCHES_DIR/$1/series" "$PATCHES_DIR/$1"/*.patch \
+        "$PATCHES_DIR/$1/local/series" "$PATCHES_DIR/$1/local"/*.patch \
+        2>/dev/null | sha256sum | awk '{print $1}'
 }
 
 PACKAGES=()
@@ -107,14 +112,17 @@ rebuild_one() {
     fi
     echo "==> Source: $SOURCE_DIR (pristine)"
 
-    # Drop any quilt state dpkg-source left for debian/patches + our symlink
+    # Drop any quilt state dpkg-source left for debian/patches, and build a
+    # merged patches dir (tracked series + pkgs/<package>/local/ on top, if
+    # present) as one consistent quilt series
     rm -rf "$SOURCE_DIR/.pc"
-    rm -f "$SOURCE_DIR/patches"
-    ln -s "$PATCHES_DIR/$PACKAGE" "$SOURCE_DIR/patches"
+    local LOCAL_DIR="$PATCHES_DIR/$PACKAGE/local"
+    sync_patches_dir "$SOURCE_DIR" "$PATCHES_DIR/$PACKAGE" "$LOCAL_DIR"
 
-    # Apply patch by patch, refreshing any that land with offsets/fuzz
-    local SERIES="$PATCHES_DIR/$PACKAGE/series"
-    local PATCH OUT REFRESHED=""
+    # Apply patch by patch, refreshing any that land with offsets/fuzz.
+    # quilt writes refreshes through each patch's symlink in place, so they
+    # land back in whichever real directory (tracked or local/) it came from.
+    local REFRESHED="" PATCH OUT
     while IFS= read -r PATCH || [[ -n "$PATCH" ]]; do
         [[ "$PATCH" =~ ^#.*$ || -z "$PATCH" ]] && continue
         echo "--- Applying: $PATCH"
@@ -130,14 +138,15 @@ rebuild_one() {
             (cd "$SOURCE_DIR" && QUILT_PC="$SOURCE_DIR/.pc" QUILT_PATCHES="$SOURCE_DIR/patches" quilt --quiltrc "$REPO_DIR/quiltrc" refresh)
             REFRESHED="$REFRESHED $PATCH"
         fi
-    done < "$SERIES"
+    done < "$SOURCE_DIR/patches/series"
 
-    # Re-bless verified version
+    # Re-bless verified version (tracked, and local if present)
     local VERSION="${SOURCE_DIR##*/${PACKAGE}-}"
     echo "$VERSION" > "$PATCHES_DIR/$PACKAGE/VERIFIED"
+    [[ -f "$LOCAL_DIR/series" ]] && echo "$VERSION" > "$LOCAL_DIR/VERIFIED"
     echo "==> Verified against $VERSION"
     if [[ -n "$REFRESHED" ]]; then
-        echo "==> Refreshed:$REFRESHED — review and commit the changes in $PATCHES_DIR/$PACKAGE/"
+        echo "==> Refreshed:$REFRESHED — review and commit the changes in $PATCHES_DIR/$PACKAGE/ (tracked ones; local/ is gitignored)"
     fi
 
     # Build (and install unless --no-install)
