@@ -1,0 +1,154 @@
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/MainWindow.vala
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/MainWindow.vala
+@@ -37,6 +37,7 @@
+         private const string ACTION_MOVE_TAB_RIGHT = "action-move-tab-right";
+         private const string ACTION_MOVE_TAB_LEFT = "action-move-tab-left";
+         public const string ACTION_MOVE_TAB_TO_NEW_WINDOW = "action-move-tab-to-new-window";
++        public const string ACTION_TAB_SET_TITLE = "action-tab-set-title";
+         private const string ACTION_SEARCH = "action-search";
+         public const string ACTION_SEARCH_NEXT = "action-search-next";
+         public const string ACTION_SEARCH_PREVIOUS = "action-search-previous";
+@@ -59,6 +60,7 @@
+             { ACTION_MOVE_TAB_RIGHT, action_move_tab_right},
+             { ACTION_MOVE_TAB_LEFT, action_move_tab_left},
+             { ACTION_MOVE_TAB_TO_NEW_WINDOW, action_move_tab_to_new_window},
++            { ACTION_TAB_SET_TITLE, action_tab_set_title },
+             { ACTION_SEARCH, action_search, null, "false", action_search_change_state },
+             { ACTION_SEARCH_NEXT, action_search_next },
+             { ACTION_SEARCH_PREVIOUS, action_search_previous }
+@@ -617,6 +619,32 @@
+             notebook.transfer_tab_to_window (present_new_empty_window ());
+         }
+ 
++        private void action_tab_set_title () {
++            var target = notebook.tab_menu_target ?? notebook.tab_view.selected_page;
++            if (target == null) {
++                return;
++            }
++
++            var term = get_term_widget (target);
++            var dialog = new Dialogs.SetTabTitleDialog (this, target.title);
++            dialog.response.connect ((response_id) => {
++                if (response_id == Gtk.ResponseType.ACCEPT) {
++                    var new_title = dialog.get_title_text ();
++                    if (new_title == "") {
++                        term.has_custom_title = false;
++                        check_for_tabs_with_same_name ();
++                    } else {
++                        term.has_custom_title = true;
++                        target.title = new_title;
++                    }
++                }
++
++                dialog.destroy ();
++            });
++
++            dialog.present ();
++        }
++
+         private void action_search_change_state (SimpleAction search_action, GLib.Variant value)
+         requires (value.is_of_type (VariantType.BOOLEAN))
+         requires (current_terminal != null) {
+@@ -727,6 +755,10 @@
+             int j = 0;
+             for (i = 0; i < notebook.n_pages; i++) {
+                 var term = get_term_widget (notebook.tab_view.get_nth_page (i));
++                if (term.has_custom_title) {
++                    continue;
++                }
++
+                 string term_path, term_label;
+                 if (term.program_string != "") {
+                     term.tab.title = term.program_string;
+@@ -748,6 +780,7 @@
+                     string term2_name = Path.get_basename (term2_path);
+ 
+                     if (term2.terminal_id != term.terminal_id &&
++                        !term2.has_custom_title &&
+                         term2_name == term_label &&
+                         term2_path != term_path) {
+ 
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/Widgets/TerminalView.vala
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Widgets/TerminalView.vala
+@@ -361,11 +361,15 @@
+         open_tab_section.append (_("Open in New Window"), MainWindow.ACTION_PREFIX + MainWindow.ACTION_MOVE_TAB_TO_NEW_WINDOW);
+         open_tab_section.append (_("Duplicate Tab"), MainWindow.ACTION_PREFIX + MainWindow.ACTION_DUPLICATE_TAB);
+ 
++        var title_section = new Menu ();
++        title_section.append (_("Set Title…"), MainWindow.ACTION_PREFIX + MainWindow.ACTION_TAB_SET_TITLE);
++
+         var reload_section = new Menu ();
+         reload_section.append (_("Reload"), MainWindow.ACTION_PREFIX + MainWindow.ACTION_TAB_RELOAD);
+ 
+         var menu = new Menu ();
+         menu.append_section (null, open_tab_section);
++        menu.append_section (null, title_section);
+         menu.append_section (null, close_tab_section);
+         menu.append_section (null, reload_section);
+ 
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/Widgets/TerminalWidget.vala
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Widgets/TerminalWidget.vala
+@@ -39,6 +39,10 @@
+         // There may be no associated tab while made restorable or when closing
+         public unowned Adw.TabPage? tab;
+ 
++        // Set when the user picks a title via the tab context menu, so
++        // automatic cwd-based tab labelling leaves it alone.
++        public bool has_custom_title { get; set; default = false; }
++
+         private const string ACTION_OPEN_IN_BROWSER = "term.open-in-browser";
+         private const string ACTION_COPY = "term.copy";
+         private const string ACTION_COPY_OUTPUT = "term.copy-output";
+--- io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1.orig/src/meson.build
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/meson.build
+@@ -15,6 +15,7 @@
+ terminal_sources = [
+     'Dialogs/ColorPreferencesDialog.vala',
+     'Dialogs/ForegroundProcessDialog.vala',
++    'Dialogs/SetTabTitleDialog.vala',
+     'Dialogs/UnsafePasteDialog.vala',
+     'Widgets/SearchToolbar.vala',
+     'Widgets/SettingsPopover.vala',
+--- /dev/null
++++ io.elementary.terminal-8.0.0+r2909+pkg98~ubuntu8.1/src/Dialogs/SetTabTitleDialog.vala
+@@ -0,0 +1,40 @@
++/*
++ * SPDX-License-Identifier: LGPL-3.0-or-later
++ * SPDX-FileCopyrightText: 2026 elementary, Inc. (https://elementary.io)
++ */
++
++public class Terminal.Dialogs.SetTabTitleDialog : Granite.MessageDialog {
++    private Gtk.Entry title_entry;
++
++    public SetTabTitleDialog (MainWindow parent, string current_title) {
++        Object (
++            transient_for: parent,
++            primary_text: _("Set Tab Title"),
++            secondary_text: _("Leave empty to name the tab automatically again."),
++            buttons: Gtk.ButtonsType.NONE
++        );
++
++        title_entry.text = current_title;
++    }
++
++    construct {
++        modal = true;
++
++        title_entry = new Gtk.Entry () {
++            activates_default = true
++        };
++
++        custom_bin.append (title_entry);
++
++        add_button (_("Cancel"), Gtk.ResponseType.CANCEL);
++
++        var set_button = (Gtk.Button) add_button (_("Set Title"), Gtk.ResponseType.ACCEPT);
++        set_button.add_css_class (Granite.CssClass.SUGGESTED);
++
++        set_default_response (Gtk.ResponseType.ACCEPT);
++    }
++
++    public string get_title_text () {
++        return title_entry.text.strip ();
++    }
++}
