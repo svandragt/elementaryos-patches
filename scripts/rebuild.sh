@@ -15,9 +15,10 @@
 # patches, and the fuzz auto-refresh would then corrupt the patch file.
 #
 # Skip logic: a successful rebuild+install stamps $WORK_DIR/.ep-built-<pkg>
-# with the .dsc version and a hash of series+patches. The package is
-# skipped while both are unchanged (a locally built .deb has the same
-# version as the stock archive one, so the installed version can't tell
+# with the .dsc version, a hash of series+patches, and a hash of the
+# installed package's dpkg md5sums. The package is skipped while all three
+# are unchanged. The md5sums hash is what catches apt reinstalling the same
+# version from the archive over a local build (the version alone can't tell
 # us). --force rebuilds regardless; --no-install never writes the stamp.
 
 set -euo pipefail
@@ -50,6 +51,13 @@ fi
 patches_hash() {
     cat "$PATCHES_DIR/$1/series" "$PATCHES_DIR/$1"/*.patch \
         "$PATCHES_DIR/$1/local/series" "$PATCHES_DIR/$1/local"/*.patch \
+        2>/dev/null | sha256sum | awk '{print $1}'
+}
+
+# Hash of the installed package's shipped-file checksums — changes when apt
+# reinstalls the stock archive build over our local one at the same version
+installed_hash() {
+    cat "/var/lib/dpkg/info/$1.md5sums" "/var/lib/dpkg/info/$1:"*.md5sums \
         2>/dev/null | sha256sum | awk '{print $1}'
 }
 
@@ -93,7 +101,7 @@ rebuild_one() {
     # Skip when this exact version + patch series was already built+installed
     local STAMP="$WORK_DIR/.ep-built-$PACKAGE"
     if [[ -z "$FORCE" && -f "$STAMP" ]] \
-        && [[ "$(cat "$STAMP")" == "$VERSION $(patches_hash "$PACKAGE")" ]]; then
+        && [[ "$(cat "$STAMP")" == "$VERSION $(patches_hash "$PACKAGE") $(installed_hash "$PACKAGE")" ]]; then
         echo "==> Up to date ($VERSION, patches unchanged) — skipping (--force to rebuild)"
         return 3
     fi
@@ -154,7 +162,7 @@ rebuild_one() {
         bash "$REPO_DIR/scripts/build.sh" "$PACKAGE" --install || return 2
         # Stamp so the next run skips this version+series (hash recomputed:
         # the apply step may have auto-refreshed patches)
-        echo "$VERSION $(patches_hash "$PACKAGE")" > "$STAMP"
+        echo "$VERSION $(patches_hash "$PACKAGE") $(installed_hash "$PACKAGE")" > "$STAMP"
     else
         bash "$REPO_DIR/scripts/build.sh" "$PACKAGE" || return 2
     fi
