@@ -1,0 +1,90 @@
+Fix bubbles that never appear, or appear as garbage
+
+The carousel holds a blank Gtk.Grid at page 0 (the swipe-to-dismiss target)
+and the real content at page 1. The scroll_to() in construct is a no-op:
+scroll_to needs a real allocation, and the carousel has no size yet. A
+toplevel has no allocation at map time either, so a retry there is only
+sometimes enough.
+
+When it doesn't land, the bubble stays on the blank page. Two visible
+symptoms, same race:
+
+  - the window paints nothing, so the compositor shows whatever was in that
+    region of the framebuffer — a rectangle of some other window's content;
+  - the carousel settles later and emits page-changed for the placeholder
+    page, which on_page_changed reads as a user swipe-to-dismiss, so the
+    bubble silently disappears.
+
+Re-assert scroll_to from a tick callback until it lands, and only trust a
+page mismatch as a real dismissal once the overlay page has actually been
+reached. Reproduced ~3-5 times in 10 with notify-send; 10/10 clean after.
+
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/AbstractBubble.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/AbstractBubble.vala
+@@ -46,6 +46,7 @@
+     private uint timeout_id;
+ 
+     private double current_swipe_progress = 1.0;
++    private bool settled_on_overlay = false;
+     private Pantheon.Desktop.Shell? desktop_shell;
+     private Pantheon.Desktop.Panel? desktop_panel;
+ 
+@@ -93,7 +94,6 @@
+         };
+         carousel.append (new Gtk.Grid ());
+         carousel.append (overlay);
+-        carousel.scroll_to (overlay, false);
+ 
+         child = carousel;
+         default_width = 332;
+@@ -114,6 +114,23 @@
+ 
+         accessible_role = ALERT;
+ 
++        // scroll_to is a no-op until the carousel has a real allocation, which a
++        // toplevel doesn't have at map time. If it never lands the bubble stays on
++        // the blank placeholder page, so the window paints nothing and the
++        // compositor shows whatever was in that framebuffer region. Re-assert it
++        // every frame until it sticks; the first success removes the callback, so
++        // it can never fight a real user swipe.
++        child.map.connect (() => {
++            carousel.add_tick_callback ((widget, clock) => {
++                if (carousel.position >= 1.0) {
++                    return Source.REMOVE;
++                }
++
++                carousel.scroll_to (overlay, false);
++                return Source.CONTINUE;
++            });
++        });
++
+         child.realize.connect (() => {
+             if (Gdk.Display.get_default () is Gdk.Wayland.Display) {
+                 //  We have to wrap in Idle otherwise the Meta.Window of the WaylandSurface in Gala is still null
+@@ -139,9 +156,24 @@
+     }
+ 
+     private void on_page_changed (Adw.Carousel carousel, uint index) {
+-        if (carousel.get_nth_page (index) != overlay) {
+-            closed (CloseReason.DISMISSED);
++        if (!get_mapped ()) {
++            return;
++        }
++
++        if (carousel.get_nth_page (index) == overlay) {
++            // The initial scroll_to doesn't land synchronously — the carousel can
++            // report being on the placeholder page once first, before settling on
++            // the overlay. Only trust a page mismatch as a real user
++            // swipe-to-dismiss once we've seen it actually reach the overlay page.
++            settled_on_overlay = true;
++            return;
+         }
++
++        if (!settled_on_overlay) {
++            return;
++        }
++
++        closed (CloseReason.DISMISSED);
+     }
+ 
+     private void update_swipe_progress (Object obj, ParamSpec pspec) {
