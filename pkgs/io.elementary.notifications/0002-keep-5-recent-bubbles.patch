@@ -30,7 +30,7 @@
          action_group = new Fdo.ActionGroup (this);
  
          server_id = connection.register_object ("/org/freedesktop/Notifications", this);
-@@ -204,6 +207,20 @@
+@@ -204,6 +207,34 @@
                      }
  
                      bubbles[id].present ();
@@ -44,8 +44,22 @@
 +                        }
 +                    }
 +
++                    // Urgent bubbles are never evicted; if the stack is all
++                    // urgent it just grows past the cap.
 +                    while (live.size > MAX_BUBBLES) {
-+                        var oldest = live.remove_at (0);
++                        int victim = -1;
++                        for (int i = 0; i < live.size; i++) {
++                            if (bubbles[live[i]].notification.priority != URGENT) {
++                                victim = i;
++                                break;
++                            }
++                        }
++
++                        if (victim < 0) {
++                            break;
++                        }
++
++                        var oldest = live.remove_at (victim);
 +                        bubbles[oldest].closed (CloseReason.EXPIRED);
 +                    }
                  }
