@@ -30,38 +30,53 @@
          action_group = new Fdo.ActionGroup (this);
  
          server_id = connection.register_object ("/org/freedesktop/Notifications", this);
-@@ -204,6 +207,34 @@
+@@ -38,6 +41,37 @@
+         connection.unregister_object (server_id);
+     }
+ 
++    // Keep only the MAX_BUBBLES newest bubbles on screen. Urgent ones are never
++    // evicted, so an all-urgent stack just grows past the cap.
++    // ponytail: O(n) rescan, fine at this size.
++    private bool trim_bubbles () {
++        var live = new Gee.ArrayList<uint32> ();
++        foreach (var e in bubbles.entries) {
++            if (e.value != null) {
++                live.add (e.key);
++            }
++        }
++
++        while (live.size > MAX_BUBBLES) {
++            int victim = -1;
++            for (int i = 0; i < live.size; i++) {
++                if (bubbles[live[i]].notification.priority != URGENT) {
++                    victim = i;
++                    break;
++                }
++            }
++
++            if (victim < 0) {
++                break;
++            }
++
++            var oldest = live.remove_at (victim);
++            bubbles[oldest].closed (CloseReason.EXPIRED);
++        }
++
++        return Source.REMOVE;
++    }
++
+     private void close_bubble (uint32 id) {
+         Bubble? bubble;
+ 
+@@ -204,6 +238,11 @@
                      }
  
                      bubbles[id].present ();
 +
-+                    // ponytail: O(n) rescan is fine at MAX_BUBBLES-ish sizes; revisit
-+                    // with a real live-count if this map ever grows large.
-+                    var live = new Gee.ArrayList<uint32> ();
-+                    foreach (var e in bubbles.entries) {
-+                        if (e.value != null) {
-+                            live.add (e.key);
-+                        }
-+                    }
-+
-+                    // Urgent bubbles are never evicted; if the stack is all
-+                    // urgent it just grows past the cap.
-+                    while (live.size > MAX_BUBBLES) {
-+                        int victim = -1;
-+                        for (int i = 0; i < live.size; i++) {
-+                            if (bubbles[live[i]].notification.priority != URGENT) {
-+                                victim = i;
-+                                break;
-+                            }
-+                        }
-+
-+                        if (victim < 0) {
-+                            break;
-+                        }
-+
-+                        var oldest = live.remove_at (victim);
-+                        bubbles[oldest].closed (CloseReason.EXPIRED);
-+                    }
++                    // Evict from an idle callback, never inline: closing a bubble
++                    // emits NotificationClosed, and doing that before Notify has
++                    // returned deadlocks clients waiting on this call.
++                    Idle.add (trim_bubbles);
                  }
  
                  if (app_settings.get_boolean ("sounds")) {
