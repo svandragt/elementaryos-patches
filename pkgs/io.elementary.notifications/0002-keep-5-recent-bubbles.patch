@@ -1,0 +1,53 @@
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/Bubble.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/Bubble.vala
+@@ -17,8 +17,6 @@
+ 
+             if (value.priority == URGENT) {
+                 contents.add_css_class ("urgent");
+-            } else {
+-                timeout = 4000;
+             }
+ 
+             content_area.add_child (contents);
+--- io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1.orig/src/DBus.vala
++++ io.elementary.notifications-8.1.2+r539+pkg15~ubuntu8.1/src/DBus.vala
+@@ -9,6 +9,7 @@
+     public signal void notification_closed (uint32 id, uint32 reason);
+ 
+     private const string X_CANONICAL_PRIVATE_SYNCHRONOUS = "x-canonical-private-synchronous";
++    private const int MAX_BUBBLES = 5;
+ 
+     private uint32 id_counter = 0;
+ 
+@@ -22,7 +23,9 @@
+     private uint server_id;
+ 
+     public Server (DBusConnection connection) throws Error {
+-        bubbles = new Gee.HashMap<uint32, Bubble?> ();
++        // ponytail: libgee 0.8 has no LinkedHashMap; TreeMap sorted on uint32 id
++        // gives the same insertion order since ids only ever increase.
++        bubbles = new Gee.TreeMap<uint32, Bubble?> ();
+         action_group = new Fdo.ActionGroup (this);
+ 
+         server_id = connection.register_object ("/org/freedesktop/Notifications", this);
+@@ -204,6 +207,20 @@
+                     }
+ 
+                     bubbles[id].present ();
++
++                    // ponytail: O(n) rescan is fine at MAX_BUBBLES-ish sizes; revisit
++                    // with a real live-count if this map ever grows large.
++                    var live = new Gee.ArrayList<uint32> ();
++                    foreach (var e in bubbles.entries) {
++                        if (e.value != null) {
++                            live.add (e.key);
++                        }
++                    }
++
++                    while (live.size > MAX_BUBBLES) {
++                        var oldest = live.remove_at (0);
++                        bubbles[oldest].closed (CloseReason.EXPIRED);
++                    }
+                 }
+ 
+                 if (app_settings.get_boolean ("sounds")) {
