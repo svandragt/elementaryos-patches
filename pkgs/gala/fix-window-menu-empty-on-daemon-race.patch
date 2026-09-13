@@ -1,5 +1,5 @@
---- a/daemon-gtk3/DBus.vala
-+++ b/daemon-gtk3/DBus.vala
+--- gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1.orig/daemon-gtk3/DBus.vala
++++ gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1/daemon-gtk3/DBus.vala
 @@ -20,18 +20,12 @@
      private List<MonitorLabel> monitor_labels = new List<MonitorLabel> ();
  
@@ -23,3 +23,33 @@
          var menu_model = DBusMenuModel.get (connection, "io.elementary.gala.WindowMenu", "/io/elementary/gala/WindowMenu");
          var action_group = DBusActionGroup.get (connection, "io.elementary.gala.WindowMenu", "/io/elementary/gala/WindowMenu");
  
+--- gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1.orig/src/Misc/WindowMenuManager.vala
++++ gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1/src/Misc/WindowMenuManager.vala
+@@ -54,16 +54,25 @@
+ 
+         menu = new Menu ();
+ 
+-        Bus.own_name (SESSION, "io.elementary.gala.WindowMenu", NONE, null, on_name_acquired, null);
++        export_window_menu.begin ();
+     }
+ 
+-    private void on_name_acquired (DBusConnection connection, string name) {
++    // Export before owning the name. A client watching for the name gets its
++    // GDBusMenuModel subscription refused if the object is not exported yet,
++    // and GLib never retries it, so the daemon's menu stays empty forever.
++    // Exporting first makes the object exist by the time the name appears.
++    private async void export_window_menu () {
++        DBusConnection connection;
+         try {
++            connection = yield Bus.get (SESSION, null);
+             connection.export_action_group ("/io/elementary/gala/WindowMenu", action_group);
+             connection.export_menu_model ("/io/elementary/gala/WindowMenu", menu);
+         } catch (Error e) {
+             warning ("Failed to export window menu model and action group: %s", e.message);
++            return;
+         }
++
++        Bus.own_name (SESSION, "io.elementary.gala.WindowMenu", NONE, null, null, null);
+     }
+ 
+     public void show_window_menu (Meta.Window window, int x, int y) {
