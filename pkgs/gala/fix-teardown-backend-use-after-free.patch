@@ -1,0 +1,25 @@
+Description: Stop gala crashing on exit in BackgroundContainer.
+ .
+ BackgroundContainer's destructor looked up the monitor manager through the
+ backend to disconnect its monitors-changed handler. On exit, mutter frees the
+ backend before gala's actors are destroyed, so the lookup segfaults in
+ meta_backend_get_monitor_manager. The crash makes the gala unit fail, which
+ triggers gnome-session-failed and ends the whole session (for example on
+ `ep restart gala`).
+ .
+ The destructor is not needed: Vala connects the handler with
+ g_signal_connect_object, which disconnects it when the container is disposed.
+--- gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1.orig/src/Background/BackgroundContainer.vala
++++ gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1/src/Background/BackgroundContainer.vala
+@@ -39,11 +39,6 @@
+         update ();
+     }
+ 
+-    ~BackgroundContainer () {
+-        unowned var monitor_manager = display.get_context ().get_backend ().get_monitor_manager ();
+-        monitor_manager.monitors_changed.disconnect (update);
+-    }
+-
+     private void update () {
+         var reference_child = (get_child_at_index (0) as BackgroundManager);
+         if (reference_child != null)
