@@ -5,3 +5,4 @@ fix-notification-destroy-use-after-free.patch
 fix-window-menu-empty-on-daemon-race.patch
 fix-startup-crashes-pass-through-and-thaw.patch
 fix-teardown-backend-use-after-free.patch
+fix-exit-abort-hot-corner-barriers.patch

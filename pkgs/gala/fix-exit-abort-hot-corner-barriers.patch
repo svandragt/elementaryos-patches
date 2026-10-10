@@ -1,0 +1,19 @@
+Description: Stop gala aborting on exit with hot-corner barriers still active.
+ .
+ On exit mutter frees the X11 backend and asserts that no pointer barriers
+ remain (meta_x11_barriers_free). Mutter never releases the gala plugin, so
+ the hot corners keep their barriers and gala aborts, which makes the gala
+ unit fail and ends the session. Remove the hot corners when the display
+ emits "closing", as gnome-shell does on shutdown; this reuses the path
+ monitor changes already take.
+--- gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1.orig/src/HotCorners/HotCornerManager.vala
++++ gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1/src/HotCorners/HotCornerManager.vala
+@@ -31,6 +31,8 @@
+         behavior_settings.changed.connect (configure);
+         unowned var monitor_manager = wm.get_display ().get_context ().get_backend ().get_monitor_manager ();
+         monitor_manager.monitors_changed.connect (configure);
++        // mutter asserts every X11 barrier is gone when it frees the backend on exit
++        wm.get_display ().closing.connect (remove_all_hot_corners);
+     }
+ 
+     public void configure () {
