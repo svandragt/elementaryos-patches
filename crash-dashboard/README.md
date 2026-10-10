@@ -105,6 +105,49 @@ for an always-on background service. If your journal/coredump ACLs
 grant your user group (e.g. `adm`) read access, this runs fine without
 root; root is only needed for Apport files in `/var/crash`.
 
+## Finding the cause of an out-of-memory logout
+
+When the kernel runs out of memory, it can kill `gnome-session-manager`,
+which ends the whole session. Gala then crashes during shutdown, so the
+dashboard shows a gala crash that is a symptom, not the cause. The kernel
+log shows only the moment of the OOM, not what grew before it.
+
+`memwatch` logs one line a minute to the journal: available RAM, free
+swap, shared memory, and the programs using the most RAM and swap. To
+install it as a user service:
+
+```ini
+# ~/.config/systemd/user/memwatch.service
+[Unit]
+Description=Memory snapshot logger
+
+[Service]
+ExecStart="/path/to/crash-dashboard/memwatch"
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now memwatch.service
+loginctl enable-linger "$USER"   # start at boot and survive a logout
+```
+
+After an unexpected logout, confirm the OOM and read the minutes before it:
+
+```bash
+journalctl --user -b | grep -i oom-kill
+journalctl -k -b | grep -E "invoked oom-killer|Killed process"
+journalctl --user -t memwatch --since "-1h"
+```
+
+Look for the program whose number rises across the snapshots. A high
+`Shmem` value usually means LXD VM guest memory. A spike shorter than a
+minute falls between snapshots; the kernel's OOM task table is then the
+only evidence.
+
 ## MCP: let an assistant fix reported crashes
 
 `-mcp` runs the same binary as a minimal MCP server over stdio (JSON-RPC

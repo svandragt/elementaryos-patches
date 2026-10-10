@@ -1,0 +1,9 @@
+#!/bin/sh
+# Log a memory snapshot each minute so the journal shows what grew before an OOM.
+while :; do
+  m=$(awk '/MemAvailable|SwapFree|Shmem:/{printf "%s %dM ", $1, $2/1024}' /proc/meminfo)
+  top=$(ps -eo rss,comm | awk 'NR>1{a[$2]+=$1} END{for(k in a) printf "%d %s\n",a[k]/1024,k}' | sort -rn | head -6 | awk '{printf "%s=%sM ",$2,$1}')
+  swap=$(for p in /proc/[0-9]*; do awk -v c="$(cat $p/comm 2>/dev/null)" '/VmSwap/{if($2>0)print int($2/1024), c}' $p/status 2>/dev/null; done | awk '{a[$2]+=$1} END{for(k in a) print a[k],k}' | sort -rn | head -4 | awk '{printf "%s=%sM ",$2,$1}')
+  echo "$m| rss: $top| swap: $swap" | systemd-cat -t memwatch
+  sleep 60
+done
