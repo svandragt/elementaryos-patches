@@ -1,6 +1,6 @@
---- gala-8.6.0+r3140+pkg133~ubuntu8.1.orig/src/WindowManager.vala
-+++ gala-8.6.0+r3140+pkg133~ubuntu8.1/src/WindowManager.vala
-@@ -567,6 +567,18 @@
+--- gala-8.6.2+r3169+pkg135~ubuntu8.1.orig/src/WindowManager.vala
++++ gala-8.6.2+r3169+pkg135~ubuntu8.1/src/WindowManager.vala
+@@ -570,6 +570,18 @@
          private void on_focus_window_changed () {
              unowned var display = get_display ();
  

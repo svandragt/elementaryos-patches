@@ -12,9 +12,9 @@ Description: Don't call destroy_completed on an already-destroyed notification a
  .
  An interrupted transition means the actor may be gone whatever the window
  type, so drop the type check.
---- gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1.orig/src/WindowManager.vala
-+++ gala-8.6.1+r3147+pkg134~ubuntu8.1+ep1/src/WindowManager.vala
-@@ -1167,12 +1167,14 @@
+--- gala-8.6.2+r3169+pkg135~ubuntu8.1.orig/src/WindowManager.vala
++++ gala-8.6.2+r3169+pkg135~ubuntu8.1/src/WindowManager.vala
+@@ -1170,12 +1170,14 @@
  
                  default:
                      if (NotificationStack.is_notification (window)) {
